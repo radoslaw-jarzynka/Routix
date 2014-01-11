@@ -62,6 +62,8 @@ namespace Routix {
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
         }
+
+        #region connections
         /// <summary>
         /// metoda wywołana po wciśnięciu "połącz z chmurą"
         /// </summary>
@@ -115,6 +117,7 @@ namespace Routix {
                 if (cloudSocket != null) cloudSocket.Close();
             }
         }
+        #endregion
 
         #region threads
         /// <summary>
@@ -161,10 +164,21 @@ namespace Routix {
                             }
                             foreach (String str in _neighbors) {
                                 Address _destAddr;
+                                Edge<string> x; //tylko temporary
                                 if (Address.TryParse(str, out _destAddr)) {
-                                    networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
-                                    if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
-                                    fillGraph();
+                                    //jeśli jest już taka ścieżka nic nie rób
+                                    if (networkGraph.TryGetEdge(_senderAddr.ToString(), _destAddr.ToString(), out x)) {
+                                    }
+                                        //jeśli nie ma
+                                    else {
+                                        //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
+                                        if (!networkGraph.Vertices.Contains(_destAddr.ToString())) networkGraph.AddVertex(_destAddr.ToString());
+                                        //dodaj ścieżkę
+                                        networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
+                                        if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
+                                        //rysuj graf
+                                        fillGraph();
+                                    }
                                 }
                             }
                         }
@@ -178,6 +192,7 @@ namespace Routix {
         /// </summary>
         public void sender() {
             while(isConnectedToCloud) {
+                //jeśli coś jest w kolejce - zdejmij i wyślij
                 if (whatToSendQueue.Count != 0) {
                     String _msg = (String)whatToSendQueue.Dequeue();
                     writer.WriteLine(_msg);
@@ -242,7 +257,10 @@ namespace Routix {
             if (sendButton.Enabled && e.KeyChar.Equals((char)Keys.Enter)) sendButton_Click(sender, e);
         }
         #endregion
-
+        #region graph drawing
+        /// <summary>
+        /// rysowanie grafu w formsie
+        /// </summary>
         private void fillGraph() {
 
             IVertexAndEdgeListGraph<string, Edge<string>> g = networkGraph;
@@ -258,8 +276,13 @@ namespace Routix {
                 } catch { }
             }
         }
+        /// <summary>
+        /// metoda potrzebna do tego, by zmiana grafu na ekranie była thread-safe
+        /// </summary>
+        /// <param name="graph">graf do wrzucenia na ekran</param>
         private void SetGraph(Microsoft.Glee.Drawing.Graph graph) {
             gViewer.Graph = graph;
         }
+        #endregion
     }
 }
