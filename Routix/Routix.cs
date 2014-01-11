@@ -14,17 +14,20 @@ using System.Windows.Forms;
 using QuickGraph;
 using AddressLibrary;
 using System.IO;
+using QuickGraph.Glee;
+using Microsoft.Glee.Drawing;
 
 namespace Routix {
 
     public partial class Routix : Form {
 
         delegate void SetTextCallback(string text);
+        delegate void SetGraphCallback(Microsoft.Glee.Drawing.Graph g);
 
         private const bool isDebug = true;
 
         private Address myAddr;
-
+        
         //dane chmury
         private IPAddress cloudAddress;        //Adres na którym chmura nasłuchuje
         private Int32 cloudPort;           //port chmury
@@ -160,7 +163,8 @@ namespace Routix {
                                 Address _destAddr;
                                 if (Address.TryParse(str, out _destAddr)) {
                                     networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
-                                    if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + "do " + _destAddr.ToString());
+                                    if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
+                                    fillGraph();
                                 }
                             }
                         }
@@ -238,5 +242,24 @@ namespace Routix {
             if (sendButton.Enabled && e.KeyChar.Equals((char)Keys.Enter)) sendButton_Click(sender, e);
         }
         #endregion
+
+        private void fillGraph() {
+
+            IVertexAndEdgeListGraph<string, Edge<string>> g = networkGraph;
+            var populator = GleeGraphExtensions.CreateGleePopulator<String, Edge<String>>(g);
+            populator.Compute();
+            Microsoft.Glee.Drawing.Graph graph = populator.GleeGraph;
+            if (this.gViewer.InvokeRequired) {
+                SetGraphCallback d = new SetGraphCallback(SetGraph);
+                this.Invoke(d, new object[] { graph });
+            } else {
+                try {
+                    gViewer.Graph = graph;
+                } catch { }
+            }
+        }
+        private void SetGraph(Microsoft.Glee.Drawing.Graph graph) {
+            gViewer.Graph = graph;
+        }
     }
 }

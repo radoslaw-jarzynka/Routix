@@ -40,6 +40,9 @@
             this.subnetTextBox = new System.Windows.Forms.TextBox();
             this.sendTextBox = new System.Windows.Forms.TextBox();
             this.sendButton = new System.Windows.Forms.Button();
+            this.gViewer = new Microsoft.Glee.GraphViewerGdi.GViewer();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // conToCloudButton
@@ -72,12 +75,12 @@
             // log
             // 
             this.log.BackColor = System.Drawing.SystemColors.Window;
-            this.log.Location = new System.Drawing.Point(7, 178);
+            this.log.Location = new System.Drawing.Point(9, 467);
             this.log.Multiline = true;
             this.log.Name = "log";
             this.log.ReadOnly = true;
             this.log.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.log.Size = new System.Drawing.Size(426, 153);
+            this.log.Size = new System.Drawing.Size(719, 145);
             this.log.TabIndex = 13;
             // 
             // cloudPortTextBox
@@ -131,28 +134,57 @@
             // 
             // sendTextBox
             // 
-            this.sendTextBox.Location = new System.Drawing.Point(7, 338);
+            this.sendTextBox.Location = new System.Drawing.Point(9, 619);
             this.sendTextBox.Name = "sendTextBox";
-            this.sendTextBox.Size = new System.Drawing.Size(344, 20);
+            this.sendTextBox.Size = new System.Drawing.Size(637, 20);
             this.sendTextBox.TabIndex = 29;
             this.sendTextBox.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.sendTextBox_KeyPress);
             // 
             // sendButton
             // 
             this.sendButton.Enabled = false;
-            this.sendButton.Location = new System.Drawing.Point(358, 335);
+            this.sendButton.Location = new System.Drawing.Point(652, 616);
             this.sendButton.Name = "sendButton";
-            this.sendButton.Size = new System.Drawing.Size(75, 23);
+            this.sendButton.Size = new System.Drawing.Size(76, 23);
             this.sendButton.TabIndex = 30;
             this.sendButton.Text = "Send";
             this.sendButton.UseVisualStyleBackColor = true;
             this.sendButton.Click += new System.EventHandler(this.sendButton_Click);
             // 
+            // gViewer
+            // 
+            this.gViewer.AsyncLayout = false;
+            this.gViewer.AutoScroll = true;
+            this.gViewer.BackwardEnabled = false;
+            this.gViewer.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.gViewer.ForwardEnabled = false;
+            this.gViewer.Graph = null;
+            this.gViewer.Location = new System.Drawing.Point(0, 0);
+            this.gViewer.MouseHitDistance = 0.05D;
+            this.gViewer.Name = "gViewer";
+            this.gViewer.NavigationVisible = true;
+            this.gViewer.PanButtonPressed = false;
+            this.gViewer.SaveButtonVisible = true;
+            this.gViewer.Size = new System.Drawing.Size(596, 452);
+            this.gViewer.TabIndex = 31;
+            this.gViewer.ZoomF = 1D;
+            this.gViewer.ZoomFraction = 0.5D;
+            this.gViewer.ZoomWindowThreshold = 0.05D;
+            // 
+            // panel1
+            // 
+            this.panel1.Controls.Add(this.gViewer);
+            this.panel1.Location = new System.Drawing.Point(132, 9);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(596, 452);
+            this.panel1.TabIndex = 32;
+            // 
             // Routix
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(445, 365);
+            this.ClientSize = new System.Drawing.Size(740, 646);
+            this.Controls.Add(this.panel1);
             this.Controls.Add(this.sendButton);
             this.Controls.Add(this.sendTextBox);
             this.Controls.Add(this.subnetTextBox);
@@ -167,6 +199,7 @@
             this.Controls.Add(this.conToCloudButton);
             this.Name = "Routix";
             this.Text = "Routix";
+            this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -186,6 +219,8 @@
         private System.Windows.Forms.TextBox subnetTextBox;
         private System.Windows.Forms.TextBox sendTextBox;
         private System.Windows.Forms.Button sendButton;
+        private Microsoft.Glee.GraphViewerGdi.GViewer gViewer;
+        private System.Windows.Forms.Panel panel1;
 
     }
 }
