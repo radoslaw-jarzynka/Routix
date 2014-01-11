@@ -32,6 +32,18 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="QuickGraph.Contracts">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\CodeContracts\QuickGraph.Contracts.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Data.Contracts">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\CodeContracts\QuickGraph.Data.Contracts.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Graphviz.Contracts">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\CodeContracts\QuickGraph.Graphviz.Contracts.dll</HintPath>
+    </Reference>
+    <Reference Include="QuickGraph.Serialization.Contracts">
+      <HintPath>..\packages\QuickGraph.3.6.61119.7\lib\net4\CodeContracts\QuickGraph.Serialization.Contracts.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -44,14 +56,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Form1.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
-    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Routix.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Routix.Designer.cs">
+      <DependentUpon>Routix.cs</DependentUpon>
+    </Compile>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -61,6 +73,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="Routix.resx">
+      <DependentUpon>Routix.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -73,6 +88,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\AddressLibrary\AddressLibrary\AddressLibrary.csproj">
+      <Project>{791d4070-60e5-4d4a-8f62-d33608c690b8}</Project>
+      <Name>AddressLibrary</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
