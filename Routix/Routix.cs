@@ -12,10 +12,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using QuickGraph;
+using QuickGraph.Algorithms;
 using AddressLibrary;
 using System.IO;
 using QuickGraph.Glee;
 using Microsoft.Glee.Drawing;
+using System.Collections.Concurrent;
 
 namespace Routix {
 
@@ -48,6 +50,13 @@ namespace Routix {
 
         public bool isConnectedToCloud { get; private set; } // czy połączony z chmurą?
 
+        private List<string> nodesInPath; //lista węzłów w ścieżce, wykorzystywane do tego by program pamiętał o tym jaka ścieżka jest wyznaczana, które LRMY są odpytywane o zasoby i mógł ją przekazać do CC
+        private List<string> _nodesInPath;
+        //private Queue _nodesInPathQueue; //kolejka - tutaj są węzły, przy których czekamy na odpowiedź o wolne zasoby
+        //private Queue nodesInPathQueue;
+
+        //private ConcurrentBag<String> nodesInPathBag;
+
         //biblioteka z tymi grafami jest chujowa i nie da się przypisać słownikowi w niej zawartemu odpowiedniego comparera
         //dlatego graf będzie zawierać adresy w postaci odpowiadających im stringów :<
         private AdjacencyGraph<String, Edge<String>> networkGraph;
@@ -58,9 +67,12 @@ namespace Routix {
             isConnectedToCloud = false;
             InitializeComponent();
             networkGraph = new AdjacencyGraph<String, Edge<String>>();
+            _nodesInPath = new List<string>();
             _whatToSendQueue = new Queue();
+            //_nodesInPathQueue = new Queue();
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
+            //nodesInPathQueue = Queue.Synchronized(_nodesInPathQueue);
         }
 
         #region connections
@@ -138,7 +150,13 @@ namespace Routix {
                     }
                     else if (_senderAddr.host == 1) {
                     #region FROM CC
-                        
+                        String[] _CCmsg = _msgArray[1].Split(new char[] { ' ' });
+                        if (_CCmsg[0] == "REQ_ROUTE") {
+                            IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
+                            string root = _CCmsg[1];
+                            string target = _CCmsg[2];
+                            calculatePath(graph, root, target);                           
+                        }
                     #endregion
                     }
                     else {
@@ -180,6 +198,31 @@ namespace Routix {
                                         fillGraph();
                                     }
                                 }
+                            }
+                        }
+                        //gdy przyszła wiadomość że łącze jest wolne
+                        if (_LRMmsg[0] == "YES") {
+                            lock (_nodesInPath) {
+                                if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
+                                if (_nodesInPath.Count == 0) {
+                                    string _routeMsg = myAddr.network + "." + myAddr.subnet + ".1:ROUTE ";
+                                    foreach(string str in nodesInPath) _routeMsg += str + " ";
+                                    whatToSendQueue.Enqueue(_routeMsg);
+                                }
+                            }
+                        }
+                        //gdy brak zasobów
+                        if (_LRMmsg[0] == "NO") {
+                            lock (_nodesInPath) {
+                                string _root = nodesInPath[0];
+                                string _target = nodesInPath[nodesInPath.Count];
+                                _nodesInPath = new List<string>();
+                                nodesInPath = new List<string>();
+                                //tymczasowy graf reprezentujący sieć bez zajętego łącza
+                                AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
+                                _networkGraph.RemoveEdge(new Edge<String>(_msgArray[0], _LRMmsg[1]));
+                                IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
+                                calculatePath(graph, _root, _target);
                             }
                         }
                     #endregion
@@ -257,7 +300,7 @@ namespace Routix {
             if (sendButton.Enabled && e.KeyChar.Equals((char)Keys.Enter)) sendButton_Click(sender, e);
         }
         #endregion
-        #region graph drawing
+        #region graphs handling
         /// <summary>
         /// rysowanie grafu w formsie
         /// </summary>
@@ -282,6 +325,32 @@ namespace Routix {
         /// <param name="graph">graf do wrzucenia na ekran</param>
         private void SetGraph(Microsoft.Glee.Drawing.Graph graph) {
             gViewer.Graph = graph;
+        }
+
+        private void calculatePath(IVertexAndEdgeListGraph<string, Edge<string>> graph, string root, string target) {
+            //IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
+            Func<Edge<String>, double> edgeCost = e => 1; // constant cost
+            //string root = _CCmsg[1];
+            TryFunc<string, System.Collections.Generic.IEnumerable<QuickGraph.Edge<string>>> tryGetPaths = graph.ShortestPathsDijkstra(edgeCost, root);
+            //string target = _CCmsg[2];
+            IEnumerable<Edge<string>> path;
+            if (tryGetPaths(target, out path)) {
+                lock (_nodesInPath) {
+                    SetText("Wyznaczona trasa od " + root + " do " + target + ":");
+                    nodesInPath = new List<string>();
+                    nodesInPath.Add(path.First().Source);
+                    foreach (Edge<string> edge in path) {
+                        SetText(edge.ToString());
+                        nodesInPath.Add(edge.Target);
+                        _nodesInPath.Add(edge.Target);
+                    }
+                }
+                //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
+                //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
+                for (int i = 0; i < nodesInPath.Count - 1; i++) {
+                    whatToSendQueue.Enqueue(nodesInPath[i] + ":IS_LINK_AVAILIBLE " + nodesInPath[i + 1]);
+                }
+            }
         }
         #endregion
     }
