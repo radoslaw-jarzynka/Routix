@@ -42,6 +42,7 @@
             this.sendButton = new System.Windows.Forms.Button();
             this.gViewer = new Microsoft.Glee.GraphViewerGdi.GViewer();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.sendTopologyButton = new System.Windows.Forms.Button();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -179,11 +180,22 @@
             this.panel1.Size = new System.Drawing.Size(596, 452);
             this.panel1.TabIndex = 32;
             // 
+            // sendTopologyButton
+            // 
+            this.sendTopologyButton.Location = new System.Drawing.Point(13, 414);
+            this.sendTopologyButton.Name = "sendTopologyButton";
+            this.sendTopologyButton.Size = new System.Drawing.Size(113, 46);
+            this.sendTopologyButton.TabIndex = 33;
+            this.sendTopologyButton.Text = "ustal Topologię między RC";
+            this.sendTopologyButton.UseVisualStyleBackColor = true;
+            this.sendTopologyButton.Click += new System.EventHandler(this.sendTopology_Click);
+            // 
             // Routix
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(740, 646);
+            this.Controls.Add(this.sendTopologyButton);
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.sendButton);
             this.Controls.Add(this.sendTextBox);
@@ -221,6 +233,7 @@
         private System.Windows.Forms.Button sendButton;
         private Microsoft.Glee.GraphViewerGdi.GViewer gViewer;
         private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Button sendTopologyButton;
 
     }
 }

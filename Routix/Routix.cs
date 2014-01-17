@@ -21,6 +21,7 @@ using QuickGraph.Glee;
 using Microsoft.Glee.Drawing;
 using System.Collections.Concurrent;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Timers;
 
 namespace Routix {
 
@@ -45,6 +46,7 @@ namespace Routix {
         private Queue _whatToSendQueue;
         private Queue whatToSendQueue;
 
+        private bool blockSending;
         //strumienie
         private NetworkStream networkStream;
 
@@ -69,6 +71,7 @@ namespace Routix {
         /// </summary>
         public Routix() {
             isConnectedToCloud = false;
+            blockSending = false;
             InitializeComponent();
             networkGraph = new AdjacencyGraph<String, Edge<String>>();
             _nodesInPath = new List<string>();
@@ -80,7 +83,7 @@ namespace Routix {
             //nodesInPathQueue = Queue.Synchronized(_nodesInPathQueue);
         }
 
-        #region connections
+        #region connections and buttons
         /// <summary>
         /// metoda wywołana po wciśnięciu "połącz z chmurą"
         /// </summary>
@@ -138,9 +141,38 @@ namespace Routix {
                 if (cloudSocket != null) cloudSocket.Close();
             }
         }
+
+        /// <summary>
+        /// gdy wciśnięty zostanie przycik ustalający topologię między węzłami
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void sendTopology_Click(object sender, EventArgs e) {
+            sendTopology();
+        }
+
+        /// <summary>
+        /// wysłanie topologii do innych RC
+        /// </summary>
+        private void sendTopology() {
+            List<String> subnets = new List<String>();
+            List<int> subnetsNumbers = new List<int>();
+            subnets = availableSubnetworks.Values.SelectMany(x => x).ToList();
+            foreach (String str in subnets) {
+                String[] _str = str.Split('.');
+                int _subnetNumber = int.Parse(_str[1]);
+                if (!subnetsNumbers.Contains(_subnetNumber)) subnetsNumbers.Add(_subnetNumber);
+            }
+            foreach (int subnetNumber in subnetsNumbers) {
+                List<String> paramsList = subnetsNumbers.ConvertAll<string>(x => x.ToString());
+                paramsList.Insert(0, "TOPOLOGY");
+                SPacket _pck = new SPacket(myAddr.ToString(), new Address(myAddr.network, subnetNumber, '0').ToString(), paramsList);
+                whatToSendQueue.Enqueue(_pck);
+            }
+        }
         #endregion
 
-        #region threads
+        #region sending & receiving
         /// <summary>
         /// wątek odbierający wiadomości z chmury
         /// </summary>
@@ -156,7 +188,55 @@ namespace Routix {
                     if (Address.TryParse(_msgList[0], out _senderAddr)) {
                         if (_senderAddr.host == 0) {
                             #region FROM ANOTHER RC
+                            if (_msgList[0] == "TOPOLOGY") {
+                                _msgList.RemoveAt(0);
+                                String[] _RCmsg = _msgList.ToArray();
+                                foreach (String str in _RCmsg) {
+                                    int subnetNumber = int.Parse(str);
+                                    //gdy dotyczy innych podsieci
+                                    if (subnetNumber != myAddr.subnet) {
+                                        String _addrString = myAddr.network + "." + subnetNumber + ".*";
+                                        //gdy nasz graf sieci zawiera już daną podsieć
+                                        if (networkGraph.ContainsVertex(_addrString)) {
+                                            Edge<string> x; //tylko temporary
+                                            //jeśli jest już taka ścieżka nic nie rób
+                                            if (networkGraph.TryGetEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString, out x)) {
+                                            } else {
+                                                //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
+                                                if (!networkGraph.Vertices.Contains(_addrString)) networkGraph.AddVertex(_addrString);
+                                                //dodaj ścieżkę
+                                                networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString));
+                                                if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.network + "." + _senderAddr.subnet + ".*" + " do " +_addrString);
+                                                //rysuj graf
+                                                fillGraph();
 
+                                                //zaktualizuj listę dostępnych podsieci
+                                                Dictionary<Address, List<String>> tempDict = new Dictionary<Address,List<string>>();
+                                                foreach (Address _addr in availableSubnetworks.Keys) {
+                                                    List<String> temp;
+                                                    availableSubnetworks.TryGetValue(_addr, out temp);
+                                                    if (temp.Contains(_senderAddr.network + "." + _senderAddr.subnet + ".*")) {
+                                                        if (!temp.Contains(_addrString)) temp.Add(_addrString);
+                                                    }
+                                                    tempDict.Add(_addr, temp);
+                                                }
+                                                availableSubnetworks = tempDict;
+
+                                                if (!blockSending) sendTopology();
+                                                blockSending = true;
+                                                //ustaw timer na 5 sekund
+                                                System.Timers.Timer timer = new System.Timers.Timer(5000);
+                                                // przypisz obsługę eventu
+                                                timer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
+                                            }
+                                        } 
+                                    } 
+                                    // gdy mojej podsieci - olej
+                                    else {
+
+                                    }
+                                }
+                            }
                             #endregion
                         } else if (_senderAddr.host == 1) {
                             #region FROM CC
@@ -318,7 +398,6 @@ namespace Routix {
             }
         }
         #endregion
-
         #region sending messages
         /// <summary>
         /// metoda wywołana po wciśnięciu "wyślij"
@@ -394,6 +473,11 @@ namespace Routix {
                     
                 }
             }
+        }
+        #endregion
+        #region event handling
+        private void OnTimedEvent(object source, ElapsedEventArgs e) {
+            blockSending = false;
         }
         #endregion
     }
