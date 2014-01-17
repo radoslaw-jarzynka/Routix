@@ -55,8 +55,9 @@ namespace Routix {
 
         private List<string> nodesInPath; //lista węzłów w ścieżce, wykorzystywane do tego by program pamiętał o tym jaka ścieżka jest wyznaczana, które LRMY są odpytywane o zasoby i mógł ją przekazać do CC
         private List<string> _nodesInPath;
-        //private Queue _nodesInPathQueue; //kolejka - tutaj są węzły, przy których czekamy na odpowiedź o wolne zasoby
-        //private Queue nodesInPathQueue;
+
+        //słownik <mójhost, podsieć z niego osiągalna>
+        private Dictionary<Address, List<String>> availableSubnetworks;
 
         //private ConcurrentBag<String> nodesInPathBag;
 
@@ -72,6 +73,7 @@ namespace Routix {
             networkGraph = new AdjacencyGraph<String, Edge<String>>();
             _nodesInPath = new List<string>();
             _whatToSendQueue = new Queue();
+            availableSubnetworks = new Dictionary<Address, List<String>>(new AddressComparer());
             //_nodesInPathQueue = new Queue();
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
@@ -143,13 +145,12 @@ namespace Routix {
         /// wątek odbierający wiadomości z chmury
         /// </summary>
         public void receiver() {
-            String _msg;
             while (isConnectedToCloud) {
                 BinaryFormatter bf = new BinaryFormatter();
                 try {
                     SPacket receivedPacket = (Packet.SPacket)bf.Deserialize(networkStream);
                     //_msg = reader.ReadLine();
-                    if (isDebug) SetText("Odczytano:\n" + receivedPacket.getSrc() + ":" + receivedPacket.getDest() + ":" + receivedPacket.getParames() );
+                    if (isDebug) SetText("Odczytano:\n" + receivedPacket.getSrc() + ":" + receivedPacket.getDest() + ":" + receivedPacket.getParames());
                     List<String> _msgList = receivedPacket.getParames();
                     Address _senderAddr;
                     if (Address.TryParse(_msgList[0], out _senderAddr)) {
@@ -159,7 +160,8 @@ namespace Routix {
                             #endregion
                         } else if (_senderAddr.host == 1) {
                             #region FROM CC
-                            String[] _CCmsg = _msg                     [1].Split(new char[] { ' ' });
+                            _msgList.RemoveAt(0);
+                            String[] _CCmsg = _msgList.ToArray();
                             if (_CCmsg[0] == "REQ_ROUTE") {
                                 IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
                                 string root = _CCmsg[1];
@@ -169,17 +171,24 @@ namespace Routix {
                             #endregion
                         } else {
                             #region FROM LRM
-                            String[] _LRMmsg = _msgArray[1].Split(new char[] { ' ' });
+                            _msgList.RemoveAt(0);
+                            String[] _LRMmsg = _msgList.ToArray();
                             //gdy logowanie się LRM
                             if (_LRMmsg[0] == "HELLO") {
                                 Address _addr;
                                 if (Address.TryParse(_LRMmsg[1], out _addr)) {
                                     if (networkGraph.ContainsVertex(_addr.ToString())) {
-                                        whatToSendQueue.Enqueue(_senderAddr.ToString() + ":ADDR_TAKEN");
+                                        List<String> _params = new List<String>();
+                                        _params.Add("ADDR_TAKEN");
+                                        SPacket packet = new SPacket(myAddr.ToString(), _senderAddr.ToString(), _params);
+                                        whatToSendQueue.Enqueue(packet);
                                     } else {
                                         networkGraph.AddVertex(_addr.ToString());
                                         if (isDebug) SetText("Dodano węzeł grafu");
-                                        whatToSendQueue.Enqueue(_addr.ToString() + ":REQ_TOPOLOGY");
+                                        List<String> _params = new List<String>();
+                                        _params.Add("REQ_TOPOLOGY");
+                                        SPacket packet = new SPacket(myAddr.ToString(), _senderAddr.ToString(), _params);
+                                        whatToSendQueue.Enqueue(packet);
                                     }
                                 }
                             }
@@ -192,16 +201,30 @@ namespace Routix {
                                     Address _destAddr;
                                     Edge<string> x; //tylko temporary
                                     if (Address.TryParse(str, out _destAddr)) {
+                                        string destAddr;
+                                        //gdy przyszło info o wezle z innej podsieci
+                                        if (_destAddr.subnet != myAddr.subnet) {
+                                            destAddr = _destAddr.network + "." + _destAddr.subnet + ".*";
+                                            List<String> temp = new List<string>();
+                                            if (availableSubnetworks.ContainsKey(_senderAddr)) {
+                                                if (availableSubnetworks.TryGetValue(_senderAddr, out temp)) {
+                                                    availableSubnetworks.Remove(_senderAddr);
+                                                }
+                                            }
+                                            temp.Add(destAddr);
+                                            availableSubnetworks.Add(_senderAddr, temp);
+                                        } else destAddr = _destAddr.ToString();
+                                        
                                         //jeśli jest już taka ścieżka nic nie rób
-                                        if (networkGraph.TryGetEdge(_senderAddr.ToString(), _destAddr.ToString(), out x)) {
+                                        if (networkGraph.TryGetEdge(_senderAddr.ToString(), destAddr, out x)) {
                                         }
                                             //jeśli nie ma
                                         else {
                                             //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
-                                            if (!networkGraph.Vertices.Contains(_destAddr.ToString())) networkGraph.AddVertex(_destAddr.ToString());
+                                            if (!networkGraph.Vertices.Contains(destAddr)) networkGraph.AddVertex(destAddr);
                                             //dodaj ścieżkę
-                                            networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
-                                            if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
+                                            networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), destAddr));
+                                            if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + destAddr);
                                             //rysuj graf
                                             fillGraph();
                                         }
@@ -213,9 +236,12 @@ namespace Routix {
                                 lock (_nodesInPath) {
                                     if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
                                     if (_nodesInPath.Count == 0) {
-                                        string _routeMsg = myAddr.network + "." + myAddr.subnet + ".1:ROUTE ";
-                                        foreach (string str in nodesInPath) _routeMsg += str + " ";
-                                        whatToSendQueue.Enqueue(_routeMsg);
+                                        List<string> _routeMsg = new List<string>();
+                                        string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
+                                        _routeMsg.Add("ROUTE");
+                                        foreach (string str in nodesInPath) _routeMsg.Add(str);
+                                        SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
+                                        whatToSendQueue.Enqueue(packet);
                                     }
                                 }
                             }
@@ -228,7 +254,7 @@ namespace Routix {
                                     nodesInPath = new List<string>();
                                     //tymczasowy graf reprezentujący sieć bez zajętego łącza
                                     AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
-                                    _networkGraph.RemoveEdge(new Edge<String>(_msgArray[0], _LRMmsg[1]));
+                                    _networkGraph.RemoveEdge(new Edge<String>(receivedPacket.getSrc(), _LRMmsg[1]));
                                     IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
                                     calculatePath(graph, _root, _target);
                                 }
@@ -236,10 +262,10 @@ namespace Routix {
                             #endregion
                         }
                     }
+                } catch {
+                    SetText("WUT");
                 }
-             catch  {
-                 SetText("WUT");
-             }
+            }
         }
         /// <summary>
         /// wątek wysyłający wiadomości do chmury
@@ -248,10 +274,11 @@ namespace Routix {
             while(isConnectedToCloud) {
                 //jeśli coś jest w kolejce - zdejmij i wyślij
                 if (whatToSendQueue.Count != 0) {
-                    String _msg = (String)whatToSendQueue.Dequeue();
-                    writer.WriteLine(_msg);
-                    writer.Flush();
-                    if (isDebug) SetText("Wysłano: " + _msg);
+                    SPacket _pck = (SPacket)whatToSendQueue.Dequeue();
+                    BinaryFormatter bformatter = new BinaryFormatter();
+                    bformatter.Serialize(networkStream, _pck);
+                    networkStream.Flush();
+                    if (isDebug) SetText("Wysłano: " + _pck.getSrc() + ":" + _pck.getDest() + ":" + _pck.getParames());
                 }
             }    
         }
@@ -359,7 +386,12 @@ namespace Routix {
                 //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
                 //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
                 for (int i = 0; i < nodesInPath.Count - 1; i++) {
-                    whatToSendQueue.Enqueue(nodesInPath[i] + ":IS_LINK_AVAILIBLE " + nodesInPath[i + 1]);
+                    List<String> _msg = new List<String>();
+                    _msg.Add("IS_LINK_AVAILIBLE");
+                    _msg.Add(nodesInPath[i+1]);
+                    SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
+                    whatToSendQueue.Enqueue(_pck);
+                    
                 }
             }
         }
