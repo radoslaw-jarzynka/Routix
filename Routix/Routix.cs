@@ -14,10 +14,13 @@ using System.Windows.Forms;
 using QuickGraph;
 using QuickGraph.Algorithms;
 using AddressLibrary;
+using Packet;
+using Packet;
 using System.IO;
 using QuickGraph.Glee;
 using Microsoft.Glee.Drawing;
 using System.Collections.Concurrent;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Routix {
 
@@ -101,10 +104,14 @@ namespace Routix {
                         cloudSocket.Connect(cloudEndPoint);
                         isConnectedToCloud = true;
                         networkStream = new NetworkStream(cloudSocket);
-                        writer = new StreamWriter(networkStream);
-                        reader = new StreamReader(networkStream);
+                        //writer = new StreamWriter(networkStream);
+                        //reader = new StreamReader(networkStream);
                         sendButton.Enabled = true;
-                        whatToSendQueue.Enqueue("HELLO " + myAddr);
+                        List<String> _welcArr = new List<String>();
+                        _welcArr.Add("HELLO");
+                        SPacket welcomePacket = new SPacket(myAddr.ToString(), "cloud", _welcArr);
+                        whatToSendQueue.Enqueue(welcomePacket);
+                        //whatToSendQueue.Enqueue("HELLO " + myAddr);
                         receiveThread = new Thread(this.receiver);
                         receiveThread.IsBackground = true;
                         receiveThread.Start();
@@ -138,97 +145,101 @@ namespace Routix {
         public void receiver() {
             String _msg;
             while (isConnectedToCloud) {
-                _msg = reader.ReadLine();
-                if (isDebug) SetText("Odczytano: " + _msg);
-                String[] _msgArray = _msg.Split(new char[] {':'}, 2);
-                Address _senderAddr;
-                if (Address.TryParse(_msgArray[0], out _senderAddr)) {
-                    if (_senderAddr.host == 0) {
-                    #region FROM ANOTHER RC
+                BinaryFormatter bf = new BinaryFormatter();
+                try {
+                    SPacket receivedPacket = (Packet.SPacket)bf.Deserialize(networkStream);
+                    //_msg = reader.ReadLine();
+                    if (isDebug) SetText("Odczytano:\n" + receivedPacket.getSrc() + ":" + receivedPacket.getDest() + ":" + receivedPacket.getParames() );
+                    List<String> _msgList = receivedPacket.getParames();
+                    Address _senderAddr;
+                    if (Address.TryParse(_msgList[0], out _senderAddr)) {
+                        if (_senderAddr.host == 0) {
+                            #region FROM ANOTHER RC
 
-                    #endregion
-                    }
-                    else if (_senderAddr.host == 1) {
-                    #region FROM CC
-                        String[] _CCmsg = _msgArray[1].Split(new char[] { ' ' });
-                        if (_CCmsg[0] == "REQ_ROUTE") {
-                            IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
-                            string root = _CCmsg[1];
-                            string target = _CCmsg[2];
-                            calculatePath(graph, root, target);                           
-                        }
-                    #endregion
-                    }
-                    else {
-                    #region FROM LRM
-                        String[] _LRMmsg = _msgArray[1].Split(new char[] { ' ' });
-                        //gdy logowanie się LRM
-                        if (_LRMmsg[0] == "HELLO") {
-                            Address _addr;
-                            if (Address.TryParse(_LRMmsg[1], out _addr)) {
-                                if (networkGraph.ContainsVertex(_addr.ToString())) {
-                                    whatToSendQueue.Enqueue(_senderAddr.ToString() + ":ADDR_TAKEN");
-                                } else {
-                                    networkGraph.AddVertex(_addr.ToString());
-                                    if (isDebug) SetText("Dodano węzeł grafu");
-                                    whatToSendQueue.Enqueue(_addr.ToString() + ":REQ_TOPOLOGY");
-                                }
+                            #endregion
+                        } else if (_senderAddr.host == 1) {
+                            #region FROM CC
+                            String[] _CCmsg = _msg                     [1].Split(new char[] { ' ' });
+                            if (_CCmsg[0] == "REQ_ROUTE") {
+                                IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
+                                string root = _CCmsg[1];
+                                string target = _CCmsg[2];
+                                calculatePath(graph, root, target);
                             }
-                        }
-                        if (_LRMmsg[0] == "TOPOLOGY") {
-                            String[] _neighbors = new String[_LRMmsg.Length - 1];
-                            for (int i = 1; i < _LRMmsg.Length; i++) {
-                                _neighbors[i - 1] = _LRMmsg[i];
-                            }
-                            foreach (String str in _neighbors) {
-                                Address _destAddr;
-                                Edge<string> x; //tylko temporary
-                                if (Address.TryParse(str, out _destAddr)) {
-                                    //jeśli jest już taka ścieżka nic nie rób
-                                    if (networkGraph.TryGetEdge(_senderAddr.ToString(), _destAddr.ToString(), out x)) {
-                                    }
-                                        //jeśli nie ma
-                                    else {
-                                        //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
-                                        if (!networkGraph.Vertices.Contains(_destAddr.ToString())) networkGraph.AddVertex(_destAddr.ToString());
-                                        //dodaj ścieżkę
-                                        networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
-                                        if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
-                                        //rysuj graf
-                                        fillGraph();
+                            #endregion
+                        } else {
+                            #region FROM LRM
+                            String[] _LRMmsg = _msgArray[1].Split(new char[] { ' ' });
+                            //gdy logowanie się LRM
+                            if (_LRMmsg[0] == "HELLO") {
+                                Address _addr;
+                                if (Address.TryParse(_LRMmsg[1], out _addr)) {
+                                    if (networkGraph.ContainsVertex(_addr.ToString())) {
+                                        whatToSendQueue.Enqueue(_senderAddr.ToString() + ":ADDR_TAKEN");
+                                    } else {
+                                        networkGraph.AddVertex(_addr.ToString());
+                                        if (isDebug) SetText("Dodano węzeł grafu");
+                                        whatToSendQueue.Enqueue(_addr.ToString() + ":REQ_TOPOLOGY");
                                     }
                                 }
                             }
-                        }
-                        //gdy przyszła wiadomość że łącze jest wolne
-                        if (_LRMmsg[0] == "YES") {
-                            lock (_nodesInPath) {
-                                if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
-                                if (_nodesInPath.Count == 0) {
-                                    string _routeMsg = myAddr.network + "." + myAddr.subnet + ".1:ROUTE ";
-                                    foreach(string str in nodesInPath) _routeMsg += str + " ";
-                                    whatToSendQueue.Enqueue(_routeMsg);
+                            if (_LRMmsg[0] == "TOPOLOGY") {
+                                String[] _neighbors = new String[_LRMmsg.Length - 1];
+                                for (int i = 1; i < _LRMmsg.Length; i++) {
+                                    _neighbors[i - 1] = _LRMmsg[i];
+                                }
+                                foreach (String str in _neighbors) {
+                                    Address _destAddr;
+                                    Edge<string> x; //tylko temporary
+                                    if (Address.TryParse(str, out _destAddr)) {
+                                        //jeśli jest już taka ścieżka nic nie rób
+                                        if (networkGraph.TryGetEdge(_senderAddr.ToString(), _destAddr.ToString(), out x)) {
+                                        }
+                                            //jeśli nie ma
+                                        else {
+                                            //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
+                                            if (!networkGraph.Vertices.Contains(_destAddr.ToString())) networkGraph.AddVertex(_destAddr.ToString());
+                                            //dodaj ścieżkę
+                                            networkGraph.AddEdge(new Edge<String>(_senderAddr.ToString(), _destAddr.ToString()));
+                                            if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.ToString() + " do " + _destAddr.ToString());
+                                            //rysuj graf
+                                            fillGraph();
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        //gdy brak zasobów
-                        if (_LRMmsg[0] == "NO") {
-                            lock (_nodesInPath) {
-                                string _root = nodesInPath[0];
-                                string _target = nodesInPath[nodesInPath.Count];
-                                _nodesInPath = new List<string>();
-                                nodesInPath = new List<string>();
-                                //tymczasowy graf reprezentujący sieć bez zajętego łącza
-                                AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
-                                _networkGraph.RemoveEdge(new Edge<String>(_msgArray[0], _LRMmsg[1]));
-                                IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
-                                calculatePath(graph, _root, _target);
+                            //gdy przyszła wiadomość że łącze jest wolne
+                            if (_LRMmsg[0] == "YES") {
+                                lock (_nodesInPath) {
+                                    if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
+                                    if (_nodesInPath.Count == 0) {
+                                        string _routeMsg = myAddr.network + "." + myAddr.subnet + ".1:ROUTE ";
+                                        foreach (string str in nodesInPath) _routeMsg += str + " ";
+                                        whatToSendQueue.Enqueue(_routeMsg);
+                                    }
+                                }
                             }
+                            //gdy brak zasobów
+                            if (_LRMmsg[0] == "NO") {
+                                lock (_nodesInPath) {
+                                    string _root = nodesInPath[0];
+                                    string _target = nodesInPath[nodesInPath.Count];
+                                    _nodesInPath = new List<string>();
+                                    nodesInPath = new List<string>();
+                                    //tymczasowy graf reprezentujący sieć bez zajętego łącza
+                                    AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
+                                    _networkGraph.RemoveEdge(new Edge<String>(_msgArray[0], _LRMmsg[1]));
+                                    IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
+                                    calculatePath(graph, _root, _target);
+                                }
+                            }
+                            #endregion
                         }
-                    #endregion
                     }
                 }
-            }
+             catch  {
+                 SetText("WUT");
+             }
         }
         /// <summary>
         /// wątek wysyłający wiadomości do chmury

@@ -2,7 +2,7 @@
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-	<AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{212C7113-0D9A-493F-9A8A-0FEDC232EAC1}</ProjectGuid>
@@ -12,6 +12,7 @@
     <AssemblyName>Routix</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -24,7 +25,6 @@
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
@@ -121,6 +121,10 @@
     <ProjectReference Include="..\..\AddressLibrary\AddressLibrary\AddressLibrary.csproj">
       <Project>{791d4070-60e5-4d4a-8f62-d33608c690b8}</Project>
       <Name>AddressLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Packet\ClassLibrary1\Packet.csproj">
+      <Project>{7c42f514-ea47-44c9-ad87-8fafc77521dc}</Project>
+      <Name>Packet</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
