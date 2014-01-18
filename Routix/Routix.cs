@@ -20,7 +20,6 @@ using QuickGraph.Glee;
 using Microsoft.Glee.Drawing;
 using System.Collections.Concurrent;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Timers;
 
 namespace Routix {
 
@@ -28,6 +27,7 @@ namespace Routix {
 
         delegate void SetTextCallback(string text);
         delegate void SetGraphCallback(Microsoft.Glee.Drawing.Graph g);
+        delegate void SetButtonCallback(bool enable);
 
         private const bool isDebug = true;
 
@@ -46,6 +46,8 @@ namespace Routix {
         private Queue whatToSendQueue;
 
         private bool blockSending;
+
+
         //strumienie
         private NetworkStream networkStream;
 
@@ -79,6 +81,7 @@ namespace Routix {
             //_nodesInPathQueue = new Queue();
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
+            //ticks = 0;
             //nodesInPathQueue = Queue.Synchronized(_nodesInPathQueue);
         }
 
@@ -165,7 +168,7 @@ namespace Routix {
             foreach (int subnetNumber in subnetsNumbers) {
                 List<String> paramsList = subnetsNumbers.ConvertAll<string>(x => x.ToString());
                 paramsList.Insert(0, "TOPOLOGY");
-                SPacket _pck = new SPacket(myAddr.ToString(), new Address(myAddr.network, subnetNumber, '0').ToString(), paramsList);
+                SPacket _pck = new SPacket(myAddr.ToString(), new Address(myAddr.network, subnetNumber, 0).ToString(), paramsList);
                 whatToSendQueue.Enqueue(_pck);
             }
         }
@@ -181,10 +184,10 @@ namespace Routix {
                 try {
                     SPacket receivedPacket = (Packet.SPacket)bf.Deserialize(networkStream);
                     //_msg = reader.ReadLine();
-                    if (isDebug) SetText("Odczytano:\n" + receivedPacket.getSrc() + ":" + receivedPacket.getDest() + ":" + receivedPacket.getParames());
+                    if (isDebug) SetText("Odczytano:\n" + receivedPacket.ToString());
                     List<String> _msgList = receivedPacket.getParames();
                     Address _senderAddr;
-                    if (Address.TryParse(_msgList[0], out _senderAddr)) {
+                    if (Address.TryParse(receivedPacket.getSrc(), out _senderAddr)) {
                         if (_senderAddr.host == 0) {
                             #region FROM ANOTHER RC
                             if (_msgList[0] == "TOPOLOGY") {
@@ -196,13 +199,15 @@ namespace Routix {
                                     if (subnetNumber != myAddr.subnet) {
                                         String _addrString = myAddr.network + "." + subnetNumber + ".*";
                                         //gdy nasz graf sieci zawiera już daną podsieć
-                                        if (networkGraph.ContainsVertex(_addrString)) {
-                                            Edge<string> x; //tylko temporary
-                                            //jeśli jest już taka ścieżka nic nie rób
-                                            if (networkGraph.TryGetEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString, out x)) {
+                                        //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
+                                        if (!networkGraph.ContainsVertex(_addrString)) {
+                                            networkGraph.AddVertex(_addrString);
+                                            if (isDebug) SetText("Dodaję nowo odkrytą sieć " + _addrString);
+                                        }
+                                        Edge<string> x; //tylko temporary
+                                        //jeśli jest już taka ścieżka nic nie rób
+                                        if (networkGraph.TryGetEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString, out x)) {
                                             } else {
-                                                //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
-                                                if (!networkGraph.Vertices.Contains(_addrString)) networkGraph.AddVertex(_addrString);
                                                 //dodaj ścieżkę
                                                 networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString));
                                                 if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.network + "." + _senderAddr.subnet + ".*" + " do " +_addrString);
@@ -223,23 +228,34 @@ namespace Routix {
 
                                                 if (!blockSending) sendTopology();
                                                 blockSending = true;
+                                                ChangeButton(false);
+                                                //timer1.Enabled = true;
+                                                //timer1.Start();
                                                 //ustaw timer na 5 sekund
-                                                System.Timers.Timer timer = new System.Timers.Timer(5000);
+                                                //timer = new System.Windows.Forms.Timer();
+                                                //timer.Tick += new EventHandler(timerTick);
+                                                //timer.Interval = 50;
+                                                //timer.Start();
                                                 // przypisz obsługę eventu
-                                                timer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
                                             }
-                                        } 
+                                       
                                     } 
                                     // gdy mojej podsieci - olej
                                     else {
-
+                                        Edge<string> x; //tylko temporary
+                                        //jeśli jest już taka ścieżka nic nie rób
+                                        foreach(String addr in networkGraph.Vertices) {
+                                            if (networkGraph.TryGetEdge(addr, _senderAddr.network + "." + _senderAddr.subnet + ".*", out x)) {
+                                                networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", addr));
+                                            }
+                                        }
                                     }
                                 }
                             }
                             #endregion
                         } else if (_senderAddr.host == 1) {
                             #region FROM CC
-                            _msgList.RemoveAt(0);
+                            //_msgList.RemoveAt(0);
                             String[] _CCmsg = _msgList.ToArray();
                             if (_CCmsg[0] == "REQ_ROUTE") {
                                 IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
@@ -250,7 +266,7 @@ namespace Routix {
                             #endregion
                         } else {
                             #region FROM LRM
-                            _msgList.RemoveAt(0);
+                            //_msgList.RemoveAt(0);
                             String[] _LRMmsg = _msgList.ToArray();
                             //gdy logowanie się LRM
                             if (_LRMmsg[0] == "HELLO") {
@@ -401,6 +417,19 @@ namespace Routix {
                 } catch { }
             }
         }
+
+        public void ChangeButton(bool enable) {
+            if (this.sendTopologyButton.InvokeRequired) {
+                SetButtonCallback d = new SetButtonCallback(ChangeButton);
+                this.Invoke(d, new object[] { enable });
+            } else {
+                this.sendTopologyButton.Enabled = enable;
+                //timer1 = new System.Windows.Forms.Timer(this.components);
+                //this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
+                this.timer1.Enabled = true;
+                this.timer1.Start();
+            }
+        }
         #endregion
         #region sending messages
         /// <summary>
@@ -479,10 +508,32 @@ namespace Routix {
             }
         }
         #endregion
-        #region event handling
-        private void OnTimedEvent(object source, ElapsedEventArgs e) {
-            blockSending = false;
+
+        private void timer1_Tick(object sender, EventArgs e) {
+            if (progressBar1.Value < 100) {
+                progressBar1.Value += 2;
+            } else {
+                progressBar1.Value = 0;
+                blockSending = false;
+                ChangeButton(true);
+                timer1.Stop();
+            }
         }
+        #region event handling
+        /*
+        private void timerTick(object source, EventArgs e) {
+            timer.Stop();
+            ticks +=1;
+            SetText(String.Empty + ticks);
+            timer.Enabled = true;
+            if (ticks == 100) {
+                blockSending = false;
+                ChangeButton(true);
+                timer.Stop();
+                ticks = 0;
+            }
+
+        }*/
         #endregion
     }
 }

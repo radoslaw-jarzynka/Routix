@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.conToCloudButton = new System.Windows.Forms.Button();
             this.cloudIPTextBox = new System.Windows.Forms.TextBox();
             this.conLabel = new System.Windows.Forms.Label();
@@ -43,6 +44,8 @@
             this.gViewer = new Microsoft.Glee.GraphViewerGdi.GViewer();
             this.panel1 = new System.Windows.Forms.Panel();
             this.sendTopologyButton = new System.Windows.Forms.Button();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -182,19 +185,31 @@
             // 
             // sendTopologyButton
             // 
-            this.sendTopologyButton.Location = new System.Drawing.Point(13, 414);
+            this.sendTopologyButton.Location = new System.Drawing.Point(9, 414);
             this.sendTopologyButton.Name = "sendTopologyButton";
-            this.sendTopologyButton.Size = new System.Drawing.Size(113, 46);
+            this.sendTopologyButton.Size = new System.Drawing.Size(117, 46);
             this.sendTopologyButton.TabIndex = 33;
             this.sendTopologyButton.Text = "ustal Topologię między RC";
             this.sendTopologyButton.UseVisualStyleBackColor = true;
             this.sendTopologyButton.Click += new System.EventHandler(this.sendTopology_Click);
+            // 
+            // timer1
+            // 
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
+            // 
+            // progressBar1
+            // 
+            this.progressBar1.Location = new System.Drawing.Point(9, 385);
+            this.progressBar1.Name = "progressBar1";
+            this.progressBar1.Size = new System.Drawing.Size(117, 23);
+            this.progressBar1.TabIndex = 34;
             // 
             // Routix
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(740, 646);
+            this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.sendTopologyButton);
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.sendButton);
@@ -234,6 +249,8 @@
         private Microsoft.Glee.GraphViewerGdi.GViewer gViewer;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Button sendTopologyButton;
+        private System.Windows.Forms.Timer timer1;
+        private System.Windows.Forms.ProgressBar progressBar1;
 
     }
 }
