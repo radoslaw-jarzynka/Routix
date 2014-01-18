@@ -15,7 +15,6 @@ using QuickGraph;
 using QuickGraph.Algorithms;
 using AddressLibrary;
 using Packet;
-using Packet;
 using System.IO;
 using QuickGraph.Glee;
 using Microsoft.Glee.Drawing;
@@ -50,8 +49,8 @@ namespace Routix {
         //strumienie
         private NetworkStream networkStream;
 
-        private StreamReader reader;
-        private StreamWriter writer;
+        //private StreamReader reader;
+        //private StreamWriter writer;
 
         public bool isConnectedToCloud { get; private set; } // czy połączony z chmurą?
 
@@ -114,7 +113,7 @@ namespace Routix {
                         sendButton.Enabled = true;
                         List<String> _welcArr = new List<String>();
                         _welcArr.Add("HELLO");
-                        SPacket welcomePacket = new SPacket(myAddr.ToString(), "cloud", _welcArr);
+                        SPacket welcomePacket = new SPacket(myAddr.ToString(), new Address(0 ,0, 0).ToString() , _welcArr);
                         whatToSendQueue.Enqueue(welcomePacket);
                         //whatToSendQueue.Enqueue("HELLO " + myAddr);
                         receiveThread = new Thread(this.receiver);
@@ -358,7 +357,12 @@ namespace Routix {
                     BinaryFormatter bformatter = new BinaryFormatter();
                     bformatter.Serialize(networkStream, _pck);
                     networkStream.Flush();
-                    if (isDebug) SetText("Wysłano: " + _pck.getSrc() + ":" + _pck.getDest() + ":" + _pck.getParames());
+                    String[] _argsToShow = _pck.getParames().ToArray();
+                    String argsToShow = "";
+                    foreach (String str in _argsToShow) {
+                        argsToShow += str+" ";
+                    }
+                    if (isDebug) SetText("Wysłano: " + _pck.getSrc() + ":" + _pck.getDest() + ":" + argsToShow);
                 }
             }    
         }
