@@ -480,8 +480,12 @@ namespace Routix {
         }
 
         private void calculatePath(IVertexAndEdgeListGraph<string, Edge<string>> graph, string root, string target) {
+            _nodesInPath = new List<string>();
             //IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
             Func<Edge<String>, double> edgeCost = e => 1; // constant cost
+
+            Address targ = Address.Parse(target);
+            if (targ.subnet != myAddr.subnet) target = targ.network + "." + targ.subnet + ".*";
             //string root = _CCmsg[1];
             TryFunc<string, System.Collections.Generic.IEnumerable<QuickGraph.Edge<string>>> tryGetPaths = graph.ShortestPathsDijkstra(edgeCost, root);
             //string target = _CCmsg[2];
@@ -493,11 +497,15 @@ namespace Routix {
                     nodesInPath.Add(path.First().Source);
                     foreach (Edge<string> edge in path) {
                         Address src = Address.Parse(edge.Source);
-                        Address dest = Address.Parse(edge.Target);
-                        if (dest.subnet != src.subnet && src.subnet == myAddr.subnet) {
-                            foreach (KeyValuePair<Address, Address> kvp in subnetConnections) {
-                                if (kvp.Key == src) {
-                                    nodesInPath.Add(kvp.Value.ToString());
+                        Address tempdest;
+                        if (!Address.TryParse(edge.Target, out tempdest)) {
+                            String[] srcArr = edge.Source.Split('.');
+                            String[] destArr = edge.Target.Split('.');
+                            if (destArr[1] != srcArr[1] && int.Parse(srcArr[1]) == myAddr.subnet) {
+                                foreach (KeyValuePair<Address, Address> kvp in subnetConnections) {
+                                    if (kvp.Key.ToString() == src.ToString()) {
+                                        nodesInPath.Add(kvp.Value.ToString());
+                                    }
                                 }
                             }
                         }
@@ -509,12 +517,14 @@ namespace Routix {
                 //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
                 //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
                 for (int i = 0; i < nodesInPath.Count - 1; i++) {
-                    List<String> _msg = new List<String>();
-                    _msg.Add("IS_LINK_AVAILIBLE");
-                    _msg.Add(nodesInPath[i+1]);
-                    SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
-                    whatToSendQueue.Enqueue(_pck);
-                    
+                    string[] srcArr = nodesInPath[i].Split('.');
+                    if (int.Parse(srcArr[1]) == myAddr.subnet) {
+                        List<String> _msg = new List<String>();
+                        _msg.Add("IS_LINK_AVAILIBLE");
+                        _msg.Add(nodesInPath[i + 1]);
+                        SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
+                        whatToSendQueue.Enqueue(_pck);
+                    }
                 }
             }
         }
