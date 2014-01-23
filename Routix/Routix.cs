@@ -332,6 +332,9 @@ namespace Routix {
                             if (_LRMmsg[0] == "YES") {
                                 lock (_nodesInPath) {
                                     if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
+                                    string[] _msgArr = _LRMmsg[1].Split('.');
+                                    string temp = _msgArr[0] + "." + _msgArr[1] + ".*";
+                                    if (_nodesInPath.Contains(temp)) _nodesInPath.Remove(temp);
                                     if (_nodesInPath.Count == 0) {
                                         List<string> _routeMsg = new List<string>();
                                         string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
