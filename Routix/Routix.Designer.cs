@@ -46,6 +46,7 @@
             this.sendTopologyButton = new System.Windows.Forms.Button();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
+            this.reqTopButton = new System.Windows.Forms.Button();
             this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -204,11 +205,22 @@
             this.progressBar1.Size = new System.Drawing.Size(117, 23);
             this.progressBar1.TabIndex = 34;
             // 
+            // reqTopButton
+            // 
+            this.reqTopButton.Location = new System.Drawing.Point(9, 277);
+            this.reqTopButton.Name = "reqTopButton";
+            this.reqTopButton.Size = new System.Drawing.Size(117, 39);
+            this.reqTopButton.TabIndex = 35;
+            this.reqTopButton.Text = "Pobierz topologię sieci z LRM-ów";
+            this.reqTopButton.UseVisualStyleBackColor = true;
+            this.reqTopButton.Click += new System.EventHandler(this.reqTopButton_Click);
+            // 
             // Routix
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(740, 646);
+            this.Controls.Add(this.reqTopButton);
             this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.sendTopologyButton);
             this.Controls.Add(this.panel1);
@@ -251,6 +263,7 @@
         private System.Windows.Forms.Button sendTopologyButton;
         private System.Windows.Forms.Timer timer1;
         private System.Windows.Forms.ProgressBar progressBar1;
+        private System.Windows.Forms.Button reqTopButton;
 
     }
 }

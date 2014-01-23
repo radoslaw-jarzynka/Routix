@@ -281,10 +281,10 @@ namespace Routix {
                                     } else {
                                         networkGraph.AddVertex(_addr.ToString());
                                         if (isDebug) SetText("Dodano węzeł grafu");
-                                        List<String> _params = new List<String>();
-                                        _params.Add("REQ_TOPOLOGY");
-                                        SPacket packet = new SPacket(myAddr.ToString(), _senderAddr.ToString(), _params);
-                                        whatToSendQueue.Enqueue(packet);
+                                        //List<String> _params = new List<String>();
+                                        //_params.Add("REQ_TOPOLOGY");
+                                        //SPacket packet = new SPacket(myAddr.ToString(), _senderAddr.ToString(), _params);
+                                        //whatToSendQueue.Enqueue(packet);
                                     }
                                 }
                             }
@@ -573,6 +573,16 @@ namespace Routix {
 
         }
         #endregion
+
+        private void reqTopButton_Click(object sender, EventArgs e) {
+            foreach (string addr in networkGraph.Vertices) {
+                Address address;
+                if(Address.TryParse(addr,out address)){
+                    SPacket pck = new SPacket(myAddr.ToString(), address.ToString(), "REQ_TOPOLOGY");
+                    whatToSendQueue.Enqueue(pck);
+                }
+            }
+        }
 
     }
 }
