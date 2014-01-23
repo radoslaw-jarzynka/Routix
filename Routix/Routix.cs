@@ -381,6 +381,7 @@ namespace Routix {
                         argsToShow += str+" ";
                     }
                     if (isDebug) SetText("Wysłano: " + _pck.getSrc() + ":" + _pck.getDest() + ":" + argsToShow);
+                    Thread.Sleep(50);
                 }
             }    
         }
@@ -556,24 +557,6 @@ namespace Routix {
             }
         }
         
-        private void timer2Tick(object source, EventArgs e) {
-            try {
-                if (progressBar1.Value < 100) {
-                    progressBar1.Value += 20;
-                } else {
-                    progressBar1.Value = 0;
-                    blockSending = true;
-                    timer1.Stop();
-                    timer1.Enabled = true;
-                    timer1.Start();
-                }
-            } catch {
-                timer1.Stop();
-                timer1.Enabled = true;
-                timer1.Start();
-            }
-
-        }
         #endregion
 
         private void reqTopButton_Click(object sender, EventArgs e) {
