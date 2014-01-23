@@ -211,7 +211,7 @@ namespace Routix {
                                         Edge<string> x; //tylko temporary
                                         //jeśli jest już taka ścieżka nic nie rób
                                         foreach (String nodeName in networkGraph.Vertices) {
-                                            if (networkGraph.TryGetEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", nodeName, out x) || networkGraph.TryGetEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString, out x)) {
+                                            if (networkGraph.ContainsEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", nodeName) || networkGraph.ContainsEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString)) {
                                             } else {
                                                 //dodaj ścieżkę
                                                 networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString));
@@ -496,15 +496,17 @@ namespace Routix {
                     nodesInPath = new List<string>();
                     nodesInPath.Add(path.First().Source);
                     foreach (Edge<string> edge in path) {
-                        Address src = Address.Parse(edge.Source);
-                        Address tempdest;
-                        if (!Address.TryParse(edge.Target, out tempdest)) {
-                            String[] srcArr = edge.Source.Split('.');
-                            String[] destArr = edge.Target.Split('.');
-                            if (destArr[1] != srcArr[1] && int.Parse(srcArr[1]) == myAddr.subnet) {
-                                foreach (KeyValuePair<Address, Address> kvp in subnetConnections) {
-                                    if (kvp.Key.ToString() == src.ToString()) {
-                                        nodesInPath.Add(kvp.Value.ToString());
+                        Address src;
+                        if (Address.TryParse(edge.Source, out src)) {
+                            Address tempdest;
+                            if (!Address.TryParse(edge.Target, out tempdest)) {
+                                String[] srcArr = edge.Source.Split('.');
+                                String[] destArr = edge.Target.Split('.');
+                                if (destArr[1] != srcArr[1] && int.Parse(srcArr[1]) == myAddr.subnet) {
+                                    foreach (KeyValuePair<Address, Address> kvp in subnetConnections) {
+                                        if (kvp.Key.ToString() == src.ToString()) {
+                                            nodesInPath.Add(kvp.Value.ToString());
+                                        }
                                     }
                                 }
                             }
@@ -544,7 +546,7 @@ namespace Routix {
                 }
             } else {
                 if (progressBar1.Value < 100) {
-                    progressBar1.Value += 10;
+                    progressBar1.Value += 20;
                 } else {
                     progressBar1.Value = 0;
                     blockSending = true;
