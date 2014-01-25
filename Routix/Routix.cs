@@ -532,6 +532,12 @@ namespace Routix {
                         whatToSendQueue.Enqueue(_pck);
                     }
                 }
+            } else {
+                //gdy nie ma ścieżki
+                string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
+                string _routeMsg ="NO_ROUTE";
+                SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
+                whatToSendQueue.Enqueue(packet);
             }
         }
         #endregion
