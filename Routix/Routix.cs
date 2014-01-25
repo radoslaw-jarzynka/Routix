@@ -400,11 +400,16 @@ namespace Routix {
             int _subnetNum;
             if (int.TryParse(networkNumberTextBox.Text, out _netNum))
                 if (int.TryParse(subnetTextBox.Text, out _subnetNum)) {
-                     myAddr = new Address(_netNum, _subnetNum, 0);
+                    myAddr = new Address(_netNum, _subnetNum, 0);
+                    Routix.ActiveForm.Text = "Routix " + myAddr.ToString();
                     return true;
-                }
-                else return false;
-            else return false;
+                } else {
+                    Routix.ActiveForm.Text = "Routix";
+                    return false;
+                } else { 
+                Routix.ActiveForm.Text = "Routix";
+                return false;
+            }
         }
         /// <summary>
         /// wstawienie tekstu do logu
