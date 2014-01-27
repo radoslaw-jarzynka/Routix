@@ -288,6 +288,16 @@ namespace Routix {
                                     }
                                 }
                             }
+                            if (_LRMmsg[0] == "DEAD") {
+                                Address deadAddr;
+                                if (Address.TryParse(_LRMmsg[1], out deadAddr)) {
+                                    if (networkGraph.ContainsVertex(deadAddr.ToString())) {
+                                        networkGraph.RemoveVertex(deadAddr.ToString());
+                                        fillGraph();
+                                        SetText("Węzeł o adresie " + deadAddr.ToString() + " przestał działać, usuwam go z grafu");
+                                    }
+                                }
+                            }
                             if (_LRMmsg[0] == "TOPOLOGY") {
                                 String[] _neighbors = new String[_LRMmsg.Length - 1];
                                 for (int i = 1; i < _LRMmsg.Length; i++) {
