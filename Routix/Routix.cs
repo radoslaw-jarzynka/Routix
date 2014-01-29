@@ -61,6 +61,7 @@ namespace Routix {
 
         //słownik <mójhost, podsieć z niego osiągalna>
         private Dictionary<Address, List<String>> availableSubnetworks;
+        private List<int> availableSubnetworksViaMe;
         //lista <mójLRM, LRM w innej podsieci>
         private List<KeyValuePair<Address, Address>> subnetConnections;
 
@@ -82,6 +83,7 @@ namespace Routix {
             _whatToSendQueue = new Queue();
             availableSubnetworks = new Dictionary<Address, List<String>>(new AddressComparer());
             subnetConnections = new List<KeyValuePair<Address, Address>>();
+            availableSubnetworksViaMe = new List<int>();
             //_nodesInPathQueue = new Queue();
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
@@ -161,6 +163,7 @@ namespace Routix {
         /// wysłanie topologii do innych RC
         /// </summary>
         private void sendTopology() {
+            /*
             List<String> subnets = new List<String>();
             List<int> subnetsNumbers = new List<int>();
             subnets = availableSubnetworks.Values.SelectMany(x => x).ToList();
@@ -173,6 +176,18 @@ namespace Routix {
                 List<String> paramsList = subnetsNumbers.ConvertAll<string>(x => x.ToString());
                 paramsList.Insert(0, "TOPOLOGY");
                 SPacket _pck = new SPacket(myAddr.ToString(), new Address(myAddr.network, subnetNumber, 0).ToString(), paramsList);
+                whatToSendQueue.Enqueue(_pck);
+            }
+             */
+            List<String> msg = new List<String>();
+            msg.Add("TOPOLOGY");
+            foreach (int subnet in availableSubnetworksViaMe) {
+                msg.Add(subnet.ToString());
+            }
+            msg.Add("VIA");
+            msg.Add(string.Empty + myAddr.subnet);
+            foreach (int subnetNumber in availableSubnetworksViaMe) {
+                SPacket _pck = new SPacket(myAddr.ToString(), new Address(myAddr.network, subnetNumber, 0).ToString(), msg);
                 whatToSendQueue.Enqueue(_pck);
             }
         }
@@ -195,62 +210,57 @@ namespace Routix {
                         if (_senderAddr.host == 0) {
                             #region FROM ANOTHER RC
                             if (_msgList[0] == "TOPOLOGY") {
-                                _msgList.RemoveAt(0);
-                                String[] _RCmsg = _msgList.ToArray();
-                                foreach (String str in _RCmsg) {
-                                    int subnetNumber = int.Parse(str);
-                                    //gdy dotyczy innych podsieci
-                                    if (subnetNumber != myAddr.subnet) {
-                                        String _addrString = myAddr.network + "." + subnetNumber + ".*";
-                                        //gdy nasz graf sieci zawiera już daną podsieć
-                                        //jeśli nie ma w węzłach grafu węzła z topologii - dodaj go
-                                        if (!networkGraph.ContainsVertex(_addrString)) {
-                                            networkGraph.AddVertex(_addrString);
-                                            if (isDebug) SetText("Dodaję nowo odkrytą sieć " + _addrString);
-                                        }
-                                        Edge<string> x; //tylko temporary
-                                        //jeśli jest już taka ścieżka nic nie rób
-                                        foreach (String nodeName in networkGraph.Vertices) {
-                                            if (networkGraph.ContainsEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", nodeName) || networkGraph.ContainsEdge(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString)) {
-                                            } else {
-                                                //dodaj ścieżkę
-                                                networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", _addrString));
-                                                if (isDebug) SetText("Dodano ścieżkę z " + _senderAddr.network + "." + _senderAddr.subnet + ".*" + " do " + _addrString);
-                                                //rysuj graf
-                                                fillGraph();
-
-                                                //zaktualizuj listę dostępnych podsieci
-                                                Dictionary<Address, List<String>> tempDict = new Dictionary<Address, List<string>>();
-                                                foreach (Address _addr in availableSubnetworks.Keys) {
-                                                    List<String> temp;
-                                                    availableSubnetworks.TryGetValue(_addr, out temp);
-                                                    if (temp.Contains(_senderAddr.network + "." + _senderAddr.subnet + ".*")) {
-                                                        if (!temp.Contains(_addrString)) temp.Add(_addrString);
+                                try {
+                                    _msgList.RemoveAt(0);
+                                    String[] _RCmsg = _msgList.ToArray();
+                                    int srcSubnetNumber = int.Parse(_RCmsg[_RCmsg.Length - 1]); //ostatnia część wiadomości to numer podsieci-źródła wiadomości
+                                    int[] subn = new int[_RCmsg.Length - 2];
+                                    for (int i = 0; i < _RCmsg.Length - 2; i++) { //tutaj -2 by ominąć elementy "VIA" i numer podsieci-źródła wiadomości
+                                        subn[i] = int.Parse(_RCmsg[i]);
+                                    }
+                                    foreach (int subnet in subn) {
+                                        string _originSubnetAddr = _senderAddr.network + "." + _senderAddr.subnet + ".*";
+                                        string _subnetAddr = myAddr.network + "." + subnet + ".*";
+                                        if (subnet == myAddr.subnet) {
+                                            //gdy przyszlo od podsieci bezposrednio z nami polaczonej
+                                            foreach (Address myHost in availableSubnetworks.Keys) {
+                                                List<string> temp;
+                                                availableSubnetworks.TryGetValue(myHost, out temp);
+                                                foreach (string addr in temp) {
+                                                    if (addr == _senderAddr.network + "." + _senderAddr.subnet + ".*") {
+                                                        if (!networkGraph.ContainsEdge(_originSubnetAddr, myHost.ToString())) {
+                                                            networkGraph.AddEdge(new Edge<string>(_originSubnetAddr, myHost.ToString()));
+                                                        }
                                                     }
-                                                    tempDict.Add(_addr, temp);
                                                 }
-                                                availableSubnetworks = tempDict;
-
-                                                if (!blockSending) sendTopology();
-                                                //blockSending = true;
-                                                ChangeButton(false);
-
                                             }
-                                        }  
-                                    } 
-                                    // gdy mojej podsieci - olej
-                                    else {
-                                        Edge<string> x; //tylko temporary
-                                        //jeśli jest już taka ścieżka nic nie rób
-                                        foreach(String addr in networkGraph.Vertices) {
-                                            if (networkGraph.TryGetEdge(addr, _senderAddr.network + "." + _senderAddr.subnet + ".*", out x)) {
-                                                networkGraph.AddEdge(new Edge<String>(_senderAddr.network + "." + _senderAddr.subnet + ".*", addr));
+                                        } else {
+                                            if (!networkGraph.ContainsVertex(_subnetAddr)) {
+                                                //gdy mamy już taki wezel grafu - nie rób nic
+                                                networkGraph.AddVertex(_subnetAddr);
+                                                SetText("Dodaję nowo odkrytą sieć " + _subnetAddr);
+                                            }
+                                            if (!networkGraph.ContainsEdge(_originSubnetAddr, _subnetAddr)) {
+                                                //gdy jest już taka krawędź - nic nie rób
+                                                networkGraph.AddEdge(new Edge<string>(_originSubnetAddr, _subnetAddr));
+                                                SetText("Dodaję ścieżkę z " + _originSubnetAddr + " do " + _subnetAddr);
                                             }
                                         }
+
+
                                         if (!blockSending) sendTopology();
-                                        //blockSending = true;
+
+                                        foreach (int _subne in availableSubnetworksViaMe) {
+                                            SPacket pck = receivedPacket;
+                                            pck.getParames().Insert(0, "TOPOLOGY");
+                                            pck.setDest(myAddr.network + "." + _subne + ".0");
+                                            if (!blockSending) whatToSendQueue.Enqueue(pck);
+                                        }
+                                        fillGraph();
                                         ChangeButton(false);
                                     }
+                                } catch {
+                                    SetText("Wyjątek przy ustalaniu topologii sieci, do poprawy :<");
                                 }
                             }
                             #endregion
@@ -281,6 +291,7 @@ namespace Routix {
                                     } else {
                                         networkGraph.AddVertex(_addr.ToString());
                                         if (isDebug) SetText("Dodano węzeł grafu");
+                                        fillGraph();
                                         //List<String> _params = new List<String>();
                                         //_params.Add("REQ_TOPOLOGY");
                                         //SPacket packet = new SPacket(myAddr.ToString(), _senderAddr.ToString(), _params);
@@ -311,6 +322,10 @@ namespace Routix {
                                         //gdy przyszło info o wezle z innej podsieci
                                         if (_destAddr.subnet != myAddr.subnet) {
                                             subnetConnections.Add(new KeyValuePair<Address,Address>(_senderAddr, _destAddr));
+                                            //dodaje informację o tym że ta sieć jest osiągalna przeze mnie
+                                            if (!availableSubnetworksViaMe.Contains(_destAddr.subnet)) {
+                                                availableSubnetworksViaMe.Add(_destAddr.subnet);
+                                            }
                                             destAddr = _destAddr.network + "." + _destAddr.subnet + ".*";
                                             List<String> temp = new List<string>();
                                             if (availableSubnetworks.ContainsKey(_senderAddr)) {
