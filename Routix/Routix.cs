@@ -264,7 +264,7 @@ namespace Routix {
                                         ChangeButton(false);
                                     }
                                 } catch (Exception e) {
-                                    SetText("Wyjątek przy ustalaniu topologii sieci, do poprawy :<\n" + e.Message);
+                                    //SetText("Wyjątek przy ustalaniu topologii sieci, do poprawy :<\n" + e.Message);
                                 }
                             }
                             #endregion
@@ -578,7 +578,7 @@ namespace Routix {
 
         #region event handling
         private void timer1_Tick(object sender, EventArgs e) {
-            if (!firstRun) {
+            /*if (!firstRun) {
                 if (progressBar1.Value < 100) {
                     progressBar1.Value += 1;
                 } else {
@@ -597,6 +597,15 @@ namespace Routix {
                     ChangeButton(false);
                     firstRun = false;
                 }
+            }*/
+            if (progressBar1.Value < 100) {
+                progressBar1.Value += 2;
+            } else {
+                progressBar1.Value = 0;
+                blockSending = true;
+                //ChangeButton(false);
+                timer1.Stop();
+                //firstRun = true;
             }
         }
         
@@ -612,5 +621,12 @@ namespace Routix {
             }
         }
 
+        private void button1_Click(object sender, EventArgs e) {
+            this.Invoke((MethodInvoker)delegate() {
+                this.sendTopologyButton.Enabled = blockSending ? true : false;
+            }); 
+            blockSending = blockSending ? false : true;
+        }
     }
 }
+
