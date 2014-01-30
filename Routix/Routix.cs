@@ -259,8 +259,8 @@ namespace Routix {
                                         fillGraph();
                                         ChangeButton(false);
                                     }
-                                } catch {
-                                    SetText("Wyjątek przy ustalaniu topologii sieci, do poprawy :<");
+                                } catch (Exception e) {
+                                    SetText("Wyjątek przy ustalaniu topologii sieci, do poprawy :<\n" + e.Message);
                                 }
                             }
                             #endregion
