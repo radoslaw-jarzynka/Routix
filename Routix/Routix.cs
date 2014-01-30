@@ -213,13 +213,14 @@ namespace Routix {
                                 try {
                                     _msgList.RemoveAt(0);
                                     String[] _RCmsg = _msgList.ToArray();
+                                    int realSenderSubnet = int.Parse(_RCmsg[_RCmsg.Length - 1]);
                                     int srcSubnetNumber = int.Parse(_RCmsg[_RCmsg.Length - 1]); //ostatnia część wiadomości to numer podsieci-źródła wiadomości
                                     int[] subn = new int[_RCmsg.Length - 2];
                                     for (int i = 0; i < _RCmsg.Length - 2; i++) { //tutaj -2 by ominąć elementy "VIA" i numer podsieci-źródła wiadomości
                                         subn[i] = int.Parse(_RCmsg[i]);
                                     }
                                     foreach (int subnet in subn) {
-                                        string _originSubnetAddr = _senderAddr.network + "." + _senderAddr.subnet + ".*";
+                                        string _originSubnetAddr = _senderAddr.network + "." + realSenderSubnet + ".*";
                                         string _subnetAddr = myAddr.network + "." + subnet + ".*";
                                         if (subnet == myAddr.subnet) {
                                             //gdy przyszlo od podsieci bezposrednio z nami polaczonej
@@ -251,9 +252,12 @@ namespace Routix {
                                         if (!blockSending) sendTopology();
 
                                         foreach (int _subne in availableSubnetworksViaMe) {
-                                            SPacket pck = receivedPacket;
-                                            pck.getParames().Insert(0, "TOPOLOGY");
-                                            pck.setDest(myAddr.network + "." + _subne + ".0");
+                                            List<string> paramList = receivedPacket.getParames();
+                                            if (paramList[0] != "TOPOLOGY") {
+                                                paramList.Insert(0, "TOPOLOGY");
+                                            }
+                                            Address destAddr = new Address(myAddr.network , _subne , 0);
+                                            SPacket pck = new SPacket(myAddr.ToString(), destAddr.ToString(), paramList);
                                             if (!blockSending) whatToSendQueue.Enqueue(pck);
                                         }
                                         fillGraph();
@@ -576,7 +580,7 @@ namespace Routix {
         private void timer1_Tick(object sender, EventArgs e) {
             if (!firstRun) {
                 if (progressBar1.Value < 100) {
-                    progressBar1.Value += 2;
+                    progressBar1.Value += 1;
                 } else {
                     progressBar1.Value = 0;
                     blockSending = false;
@@ -586,7 +590,7 @@ namespace Routix {
                 }
             } else {
                 if (progressBar1.Value < 100) {
-                    progressBar1.Value += 20;
+                    progressBar1.Value += 10;
                 } else {
                     progressBar1.Value = 0;
                     blockSending = true;
