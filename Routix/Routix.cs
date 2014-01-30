@@ -518,60 +518,83 @@ namespace Routix {
         }
 
         private void calculatePath(IVertexAndEdgeListGraph<string, Edge<string>> graph, string root, string target) {
-            _nodesInPath = new List<string>();
-            //IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
-            Func<Edge<String>, double> edgeCost = e => 1; // constant cost
+            if (root != target)
+            {
+                _nodesInPath = new List<string>();
+                //IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
+                Func<Edge<String>, double> edgeCost = e => 1; // constant cost
 
-            Address targ = Address.Parse(target);
-            if (targ.subnet != myAddr.subnet) target = targ.network + "." + targ.subnet + ".*";
-            //string root = _CCmsg[1];
-            TryFunc<string, System.Collections.Generic.IEnumerable<QuickGraph.Edge<string>>> tryGetPaths = graph.ShortestPathsDijkstra(edgeCost, root);
-            //string target = _CCmsg[2];
-            IEnumerable<Edge<string>> path;
-            if (tryGetPaths(target, out path)) {
-                lock (_nodesInPath) {
-                    SetText("Wyznaczona trasa od " + root + " do " + target + ":");
-                    nodesInPath = new List<string>();
-                    nodesInPath.Add(path.First().Source);
-                    foreach (Edge<string> edge in path) {
-                        Address src;
-                        if (Address.TryParse(edge.Source, out src)) {
-                            Address tempdest;
-                            if (!Address.TryParse(edge.Target, out tempdest)) {
-                                String[] srcArr = edge.Source.Split('.');
-                                String[] destArr = edge.Target.Split('.');
-                                if (destArr[1] != srcArr[1] && int.Parse(srcArr[1]) == myAddr.subnet) {
-                                    foreach (KeyValuePair<Address, Address> kvp in subnetConnections) {
-                                        if (kvp.Key.ToString() == src.ToString()) {
-                                            nodesInPath.Add(kvp.Value.ToString());
+                Address targ = Address.Parse(target);
+                if (targ.subnet != myAddr.subnet) target = targ.network + "." + targ.subnet + ".*";
+                //string root = _CCmsg[1];
+                TryFunc<string, System.Collections.Generic.IEnumerable<QuickGraph.Edge<string>>> tryGetPaths = graph.ShortestPathsDijkstra(edgeCost, root);
+                //string target = _CCmsg[2];
+                IEnumerable<Edge<string>> path;
+                if (tryGetPaths(target, out path))
+                {
+                    lock (_nodesInPath)
+                    {
+                        SetText("Wyznaczona trasa od " + root + " do " + target + ":");
+                        nodesInPath = new List<string>();
+                        nodesInPath.Add(path.First().Source);
+                        foreach (Edge<string> edge in path)
+                        {
+                            Address src;
+                            if (Address.TryParse(edge.Source, out src))
+                            {
+                                Address tempdest;
+                                if (!Address.TryParse(edge.Target, out tempdest))
+                                {
+                                    String[] srcArr = edge.Source.Split('.');
+                                    String[] destArr = edge.Target.Split('.');
+                                    if (destArr[1] != srcArr[1] && int.Parse(srcArr[1]) == myAddr.subnet)
+                                    {
+                                        foreach (KeyValuePair<Address, Address> kvp in subnetConnections)
+                                        {
+                                            if (kvp.Key.ToString() == src.ToString())
+                                            {
+                                                nodesInPath.Add(kvp.Value.ToString());
+                                            }
                                         }
                                     }
                                 }
                             }
+                            SetText(edge.ToString());
+                            nodesInPath.Add(edge.Target);
+                            _nodesInPath.Add(edge.Target);
                         }
-                        SetText(edge.ToString());
-                        nodesInPath.Add(edge.Target);
-                        _nodesInPath.Add(edge.Target);
+                    }
+                    //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
+                    //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
+                    for (int i = 0; i < nodesInPath.Count - 1; i++)
+                    {
+                        string[] srcArr = nodesInPath[i].Split('.');
+                        if (int.Parse(srcArr[1]) == myAddr.subnet)
+                        {
+                            List<String> _msg = new List<String>();
+                            _msg.Add("IS_LINK_AVAILIBLE");
+                            _msg.Add(nodesInPath[i + 1]);
+                            SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
+                            whatToSendQueue.Enqueue(_pck);
+                        }
                     }
                 }
-                //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
-                //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
-                for (int i = 0; i < nodesInPath.Count - 1; i++) {
-                    string[] srcArr = nodesInPath[i].Split('.');
-                    if (int.Parse(srcArr[1]) == myAddr.subnet) {
-                        List<String> _msg = new List<String>();
-                        _msg.Add("IS_LINK_AVAILIBLE");
-                        _msg.Add(nodesInPath[i + 1]);
-                        SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
-                        whatToSendQueue.Enqueue(_pck);
-                    }
+                else
+                {
+                    //gdy nie ma ścieżki
+                    string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
+                    string _routeMsg = "NO_ROUTE";
+                    SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
+                    whatToSendQueue.Enqueue(packet);
                 }
-            } else {
-                //gdy nie ma ścieżki
-                string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
-                string _routeMsg ="NO_ROUTE";
-                SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
-                whatToSendQueue.Enqueue(packet);
+            }
+            else
+            {
+                List<string> _msg = new List<string>();
+                _msg.Add("ROUTE");
+                _msg.Add(root);
+                SPacket pck = new SPacket(myAddr.ToString(), myAddr.network + "." + myAddr.subnet + ".1", _msg);
+                whatToSendQueue.Enqueue(pck);
             }
         }
         #endregion
@@ -626,6 +649,7 @@ namespace Routix {
                 this.sendTopologyButton.Enabled = blockSending ? true : false;
             }); 
             blockSending = blockSending ? false : true;
+            isConnectedToCloud = isConnectedToCloud ? false : true;
         }
     }
 }
