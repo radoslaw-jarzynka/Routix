@@ -48,6 +48,7 @@ namespace Routix {
         private bool blockSending;
         private bool firstRun;
 
+
         //strumienie
         private NetworkStream networkStream;
 
@@ -58,7 +59,8 @@ namespace Routix {
 
         private List<string> nodesInPath; //lista węzłów w ścieżce, wykorzystywane do tego by program pamiętał o tym jaka ścieżka jest wyznaczana, które LRMY są odpytywane o zasoby i mógł ją przekazać do CC
         private List<string> _nodesInPath;
-
+        private string nodeSource;
+        private string nodeTarget;
         //słownik <mójhost, podsieć z niego osiągalna>
         private Dictionary<Address, List<String>> availableSubnetworks;
         private List<int> availableSubnetworksViaMe;
@@ -378,12 +380,16 @@ namespace Routix {
                             if (_LRMmsg[0] == "NO") {
                                 lock (_nodesInPath) {
                                     string _root = nodesInPath[0];
-                                    string _target = nodesInPath[nodesInPath.Count];
+                                    string _target = nodesInPath[nodesInPath.Count-1];
                                     _nodesInPath = new List<string>();
                                     nodesInPath = new List<string>();
                                     //tymczasowy graf reprezentujący sieć bez zajętego łącza
                                     AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
-                                    _networkGraph.RemoveEdge(new Edge<String>(receivedPacket.getSrc(), _LRMmsg[1]));
+                                    Edge<string> edge;
+                                    _networkGraph.TryGetEdge(receivedPacket.getSrc(), _LRMmsg[1], out edge);
+                                    _networkGraph.RemoveEdge(edge);
+                                    //_networkGraph.RemoveEdge(new Edge<String>(receivedPacket.getSrc(), _LRMmsg[1]));
+                                    //_networkGraph.RemoveEdge(new Edge<String>(_LRMmsg[1], receivedPacket.getSrc()));
                                     IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
                                     calculatePath(graph, _root, _target);
                                 }
@@ -405,7 +411,7 @@ namespace Routix {
                 if (whatToSendQueue.Count != 0) {
                     SPacket _pck = (SPacket)whatToSendQueue.Dequeue();
                     BinaryFormatter bformatter = new BinaryFormatter();
-                    bformatter.Serialize(networkStream, _pck);
+                    if (!blockSending) bformatter.Serialize(networkStream, _pck);
                     networkStream.Flush();
                     String[] _argsToShow = _pck.getParames().ToArray();
                     String argsToShow = "";
@@ -572,7 +578,7 @@ namespace Routix {
                         if (int.Parse(srcArr[1]) == myAddr.subnet)
                         {
                             List<String> _msg = new List<String>();
-                            _msg.Add("IS_LINK_AVAILIBLE");
+                            _msg.Add("IS_LINK_AVAILABLE");
                             _msg.Add(nodesInPath[i + 1]);
                             SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
                             whatToSendQueue.Enqueue(_pck);
@@ -649,7 +655,7 @@ namespace Routix {
                 this.sendTopologyButton.Enabled = blockSending ? true : false;
             }); 
             blockSending = blockSending ? false : true;
-            isConnectedToCloud = isConnectedToCloud ? false : true;
+            //isConnectedToCloud = isConnectedToCloud ? false : true;
         }
     }
 }
