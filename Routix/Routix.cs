@@ -385,6 +385,7 @@ namespace Routix {
                                     AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
                                     _networkGraph.RemoveEdge(new Edge<String>(receivedPacket.getSrc(), _LRMmsg[1]));
                                     IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
+                                    fillGraph();
                                     calculatePath(graph, _root, _target);
                                 }
                             }
