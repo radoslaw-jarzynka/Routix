@@ -48,7 +48,7 @@ namespace Routix {
         private bool blockSending;
         private bool firstRun;
 
-
+        int exceptionCount;
         //strumienie
         private NetworkStream networkStream;
 
@@ -86,6 +86,7 @@ namespace Routix {
             availableSubnetworks = new Dictionary<Address, List<String>>(new AddressComparer());
             subnetConnections = new List<KeyValuePair<Address, Address>>();
             availableSubnetworksViaMe = new List<int>();
+            exceptionCount = 0;
             //_nodesInPathQueue = new Queue();
             //synchroniczny wrapper dla kolejki
             whatToSendQueue = Queue.Synchronized(_whatToSendQueue);
@@ -121,7 +122,6 @@ namespace Routix {
                         networkStream = new NetworkStream(cloudSocket);
                         //writer = new StreamWriter(networkStream);
                         //reader = new StreamReader(networkStream);
-                        sendButton.Enabled = true;
                         List<String> _welcArr = new List<String>();
                         _welcArr.Add("HELLO");
                         SPacket welcomePacket = new SPacket(myAddr.ToString(), new Address(0 ,0, 0).ToString() , _welcArr);
@@ -135,6 +135,7 @@ namespace Routix {
                         sendThread.Start();
                         conToCloudButton.Text = "Rozłącz";
                         SetText("Połączono!");
+                        exceptionCount = 0;
                     } catch (SocketException) {
                         isConnectedToCloud = false;
                         SetText("Błąd podczas łączenia się z chmurą");
@@ -145,7 +146,6 @@ namespace Routix {
                 }
             } else {
                 isConnectedToCloud = false;
-                sendButton.Enabled = false;
                 conToCloudButton.Text = "Połącz";
                 SetText("Rozłączono!");
                 if (cloudSocket != null) cloudSocket.Close();
@@ -400,6 +400,15 @@ namespace Routix {
                     }
                 } catch {
                     SetText("WUT");
+                    if (++exceptionCount == 5) {
+                        this.Invoke((MethodInvoker)delegate() {
+                            isConnectedToCloud = false;
+                            this.sendTopologyButton.Enabled = blockSending ? true : false;
+                            conToCloudButton.Text = "Połącz";
+                            SetText("Rozłączono!");
+                            if (cloudSocket != null) cloudSocket.Close();
+                        }); 
+                    }
                 }
             }
         }
@@ -476,25 +485,6 @@ namespace Routix {
                 this.timer1.Enabled = true;
                 this.timer1.Start();
             }
-        }
-        #endregion
-        #region sending messages
-        /// <summary>
-        /// metoda wywołana po wciśnięciu "wyślij"
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void sendButton_Click(object sender, EventArgs e) {
-            whatToSendQueue.Enqueue(sendTextBox.Text);
-            sendTextBox.Clear();
-        }
-        /// <summary>
-        /// obsługa wciśnięcia klawisza ENTER
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void sendTextBox_KeyPress(object sender, KeyPressEventArgs e) {
-            if (sendButton.Enabled && e.KeyChar.Equals((char)Keys.Enter)) sendButton_Click(sender, e);
         }
         #endregion
         #region graphs handling
