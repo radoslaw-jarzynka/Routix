@@ -530,7 +530,7 @@ namespace Routix {
                 if (tryGetPaths(target, out path))
                 {
                     lock (_nodesInPath)
-                    {
+                    { 
                         SetText("Wyznaczona trasa od " + root + " do " + target + ":");
                         nodesInPath = new List<string>();
                         nodesInPath.Add(path.First().Source);
