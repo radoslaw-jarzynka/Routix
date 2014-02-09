@@ -57,8 +57,9 @@ namespace Routix {
 
         public bool isConnectedToCloud { get; private set; } // czy połączony z chmurą?
 
-        private List<string> nodesInPath; //lista węzłów w ścieżce, wykorzystywane do tego by program pamiętał o tym jaka ścieżka jest wyznaczana, które LRMY są odpytywane o zasoby i mógł ją przekazać do CC
-        private List<string> _nodesInPath;
+        private List<List<string>> nodesInPath; //lista węzłów w ścieżce, wykorzystywane do tego by program pamiętał o tym jaka ścieżka jest wyznaczana, które LRMY są odpytywane o zasoby i mógł ją przekazać do CC
+        private List<List<string>> _nodesInPath;
+        private int numberOfRoutes;
         private string nodeSource;
         private string nodeTarget;
         //słownik <mójhost, podsieć z niego osiągalna>
@@ -77,12 +78,14 @@ namespace Routix {
         /// </summary>
         public Routix() {
             sendRoute = true;
+            numberOfRoutes = 0;
             firstRun = true;
             isConnectedToCloud = false;
             blockSending = false;
             InitializeComponent();
             networkGraph = new AdjacencyGraph<String, Edge<String>>();
-            _nodesInPath = new List<string>();
+            nodesInPath = new List<List<string>>();
+            _nodesInPath = new List<List<string>>();
             _whatToSendQueue = new Queue();
             availableSubnetworks = new Dictionary<Address, List<String>>(new AddressComparer());
             subnetConnections = new List<KeyValuePair<Address, Address>>();
@@ -287,7 +290,8 @@ namespace Routix {
                                     _graph.RemoveVertex(_CCmsg[3]);
                                     graph = _graph;
                                 }
-                                calculatePath(graph, root, target);
+                                numberOfRoutes++;
+                                calculatePath(graph, root, target, numberOfRoutes);
                             }
                             #endregion
                         } else {
@@ -371,31 +375,34 @@ namespace Routix {
                             //gdy przyszła wiadomość że łącze jest wolne
                             if (_LRMmsg[0] == "YES") {
                                 lock (_nodesInPath) {
-                                    if (_nodesInPath.Contains(_LRMmsg[1])) _nodesInPath.Remove(_LRMmsg[1]);
+                                    int _index = int.Parse(_LRMmsg[2]);
+                                    if (_nodesInPath[_index].Contains(_LRMmsg[1])) _nodesInPath[_index].Remove(_LRMmsg[1]);
                                     string[] _msgArr = _LRMmsg[1].Split('.');
                                     string temp = _msgArr[0] + "." + _msgArr[1] + ".*";
-                                    if (_nodesInPath.Contains(temp)) _nodesInPath.Remove(temp);
-                                    if (_nodesInPath.Count == 0) {
+                                    if (_nodesInPath[_index].Contains(temp)) _nodesInPath[_index].Remove(temp);
+                                    if (_nodesInPath[_index].Count == 0) {
                                         List<string> _routeMsg = new List<string>();
                                         string ccAddr = myAddr.network + "." + myAddr.subnet + ".1";
                                         _routeMsg.Add("ROUTE");
-                                        foreach (string str in nodesInPath) _routeMsg.Add(str);
+                                        foreach (string str in nodesInPath[_index]) _routeMsg.Add(str);
                                         SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
-                                        if (sendRoute)
-                                        {
+                                        //if (sendRoute)
+                                        //{
                                             whatToSendQueue.Enqueue(packet);
                                             sendRoute = false;
-                                        }
+                                        //}
                                     }
                                 }
                             }
                             //gdy brak zasobów
                             if (_LRMmsg[0] == "NO") {
                                 lock (_nodesInPath) {
-                                    string _root = nodesInPath[0];
-                                    string _target = nodesInPath[nodesInPath.Count-1];
-                                    _nodesInPath = new List<string>();
-                                    nodesInPath = new List<string>();
+                                    int _index = int.Parse(_LRMmsg[2]);
+                                    string _root = nodesInPath[_index][0];
+                                    string _target = nodesInPath[_index][nodesInPath.Count-1];
+                                    numberOfRoutes++;
+                                    _nodesInPath[numberOfRoutes] = new List<string>();
+                                    nodesInPath[numberOfRoutes] = new List<string>();
                                     //tymczasowy graf reprezentujący sieć bez zajętego łącza
                                     AdjacencyGraph<String, Edge<String>> _networkGraph = copyGraph(networkGraph);
                                     Edge<string> edge;
@@ -405,7 +412,7 @@ namespace Routix {
                                     //_networkGraph.RemoveEdge(new Edge<String>(_LRMmsg[1], receivedPacket.getSrc()));
                                     IVertexAndEdgeListGraph<string, Edge<string>> graph = _networkGraph;
                                     fillGraph();
-                                    calculatePath(graph, _root, _target);
+                                    calculatePath(graph, _root, _target, numberOfRoutes);
                                 }
                             }
                             #endregion
@@ -527,10 +534,15 @@ namespace Routix {
             gViewer.Graph = graph;
         }
 
-        private void calculatePath(IVertexAndEdgeListGraph<string, Edge<string>> graph, string root, string target) {
+        private void calculatePath(IVertexAndEdgeListGraph<string, Edge<string>> graph, string root, string target, int index) {
             if (root != target)
             {
-                _nodesInPath = new List<string>();
+                if (_nodesInPath.Count != index + 1) {
+                    while (_nodesInPath.Count != index + 1) {
+                        _nodesInPath.Add(new List<string>());
+                    }
+                }
+                _nodesInPath[index] = new List<string>();
                 //IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
                 Func<Edge<String>, double> edgeCost = e => 1; // constant cost
 
@@ -545,8 +557,13 @@ namespace Routix {
                     lock (_nodesInPath)
                     { 
                         SetText("Wyznaczona trasa od " + root + " do " + target + ":");
-                        nodesInPath = new List<string>();
-                        nodesInPath.Add(path.First().Source);
+                        if (nodesInPath.Count != index + 1) {
+                            while (nodesInPath.Count != index + 1) {
+                                nodesInPath.Add(new List<string>());
+                            }
+                        }
+                        nodesInPath[index] = new List<string>();
+                        nodesInPath[index].Add(path.First().Source);
                         foreach (Edge<string> edge in path)
                         {
                             Address src;
@@ -563,29 +580,30 @@ namespace Routix {
                                         {
                                             if (kvp.Key.ToString() == src.ToString())
                                             {
-                                                nodesInPath.Add(kvp.Value.ToString());
+                                                nodesInPath[index].Add(kvp.Value.ToString());
                                             }
                                         }
                                     }
                                 }
                             }
                             SetText(edge.ToString());
-                            nodesInPath.Add(edge.Target);
+                            nodesInPath[index].Add(edge.Target);
                             String[] _arr = edge.Target.Split('.');
-                            if (_arr[2] != "*") _nodesInPath.Add(edge.Target);
+                            if (_arr[2] != "*") _nodesInPath[index].Add(edge.Target);
                         }
                     }
                     //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
                     //nie pyta się ostatniego LRM w ścieżce, zakładam że jak w jedną stronę jest połączenie to i w drugą jest
-                    for (int i = 0; i < nodesInPath.Count - 1; i++)
+                    for (int i = 0; i < nodesInPath[index].Count - 1; i++)
                     {
-                        string[] srcArr = nodesInPath[i].Split('.');
+                        string[] srcArr = nodesInPath[index][i].Split('.');
                         if (int.Parse(srcArr[1]) == myAddr.subnet)
                         {
                             List<String> _msg = new List<String>();
                             _msg.Add("IS_LINK_AVAILABLE");
-                            _msg.Add(nodesInPath[i + 1]);
-                            SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[i], _msg);
+                            _msg.Add(nodesInPath[index][i + 1]);
+                            _msg.Add(String.Empty + index);
+                            SPacket _pck = new SPacket(myAddr.ToString(), nodesInPath[index][i], _msg);
                             whatToSendQueue.Enqueue(_pck);
                         }
                     }
