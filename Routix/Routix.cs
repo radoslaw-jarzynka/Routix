@@ -282,7 +282,8 @@ namespace Routix {
                                 string target = _CCmsg[2];
                                 if (_CCmsg.Length == 4)
                                 {
-                                    AdjacencyGraph<String, Edge<String>> _graph = networkGraph;
+                                    
+                                    AdjacencyGraph<String, Edge<String>> _graph = copyGraph(networkGraph);
                                     _graph.RemoveVertex(_CCmsg[3]);
                                     graph = _graph;
                                 }
@@ -396,7 +397,7 @@ namespace Routix {
                                     _nodesInPath = new List<string>();
                                     nodesInPath = new List<string>();
                                     //tymczasowy graf reprezentujący sieć bez zajętego łącza
-                                    AdjacencyGraph<String, Edge<String>> _networkGraph = networkGraph;
+                                    AdjacencyGraph<String, Edge<String>> _networkGraph = copyGraph(networkGraph);
                                     Edge<string> edge;
                                     _networkGraph.TryGetEdge(receivedPacket.getSrc(), _LRMmsg[1], out edge);
                                     _networkGraph.RemoveEdge(edge);
@@ -661,6 +662,21 @@ namespace Routix {
             blockSending = blockSending ? false : true;
             //isConnectedToCloud = isConnectedToCloud ? false : true;
         }
+
+        private AdjacencyGraph<String, Edge<String>> copyGraph(AdjacencyGraph<String, Edge<String>> graph)
+        {
+            AdjacencyGraph<String, Edge<String>> _graph = new AdjacencyGraph<string, Edge<string>>();
+            foreach (String vertex in graph.Vertices)
+            {
+                _graph.AddVertex(vertex);
+            }
+            foreach (Edge<String> edge in graph.Edges)
+            {
+                _graph.AddEdge(edge);
+            }
+            return _graph;
+        }
+            
     }
 }
 
