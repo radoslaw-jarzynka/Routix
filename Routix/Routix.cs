@@ -47,7 +47,7 @@ namespace Routix {
 
         private bool blockSending;
         private bool firstRun;
-        private bool sendRoute;
+        private List<bool> sendRoute;
         int exceptionCount;
         //strumienie
         private NetworkStream networkStream;
@@ -77,7 +77,7 @@ namespace Routix {
         /// konstruktor
         /// </summary>
         public Routix() {
-            sendRoute = true;
+            for (int i = 0; i < 100; i++ ) sendRoute[i] = true;
             numberOfRoutes = 0;
             firstRun = true;
             isConnectedToCloud = false;
@@ -279,7 +279,6 @@ namespace Routix {
                             //_msgList.RemoveAt(0);
                             String[] _CCmsg = _msgList.ToArray();
                             if (_CCmsg[0] == "REQ_ROUTE") {
-                                sendRoute = true;
                                 IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
                                 string root = _CCmsg[1];
                                 string target = _CCmsg[2];
@@ -291,6 +290,7 @@ namespace Routix {
                                     graph = _graph;
                                 }
                                 numberOfRoutes++;
+                                sendRoute[numberOfRoutes] = true;
                                 calculatePath(graph, root, target, numberOfRoutes);
                             }
                             #endregion
@@ -386,11 +386,11 @@ namespace Routix {
                                         _routeMsg.Add("ROUTE");
                                         foreach (string str in nodesInPath[_index]) _routeMsg.Add(str);
                                         SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
-                                        //if (sendRoute)
-                                        //{
+                                        if (sendRoute[_index])
+                                        {
                                             whatToSendQueue.Enqueue(packet);
-                                            sendRoute = false;
-                                        //}
+                                            sendRoute[_index] = false;
+                                        }
                                     }
                                 }
                             }
