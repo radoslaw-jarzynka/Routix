@@ -402,6 +402,16 @@ namespace Routix {
                                     string _root = nodesInPath[_index][0];
                                     string _target = nodesInPath[_index][nodesInPath.Count-1];
                                     numberOfRoutes++;
+                                    if (_nodesInPath.Count != numberOfRoutes + 1) {
+                                        while (_nodesInPath.Count != numberOfRoutes + 1) {
+                                            _nodesInPath.Add(new List<string>());
+                                        }
+                                    }
+                                    if (nodesInPath.Count != numberOfRoutes + 1) {
+                                        while (nodesInPath.Count != numberOfRoutes + 1) {
+                                            nodesInPath.Add(new List<string>());
+                                        }
+                                    }
                                     _nodesInPath[numberOfRoutes] = new List<string>();
                                     nodesInPath[numberOfRoutes] = new List<string>();
                                     //tymczasowy graf reprezentujący sieć bez zajętego łącza
