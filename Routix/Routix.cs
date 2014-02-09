@@ -280,6 +280,12 @@ namespace Routix {
                                 IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
                                 string root = _CCmsg[1];
                                 string target = _CCmsg[2];
+                                if (_CCmsg.Length == 4)
+                                {
+                                    AdjacencyGraph<String, Edge<String>> _graph = networkGraph;
+                                    _graph.RemoveVertex(_CCmsg[3]);
+                                    graph = _graph;
+                                }
                                 calculatePath(graph, root, target);
                             }
                             #endregion
