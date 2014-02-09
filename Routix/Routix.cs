@@ -77,6 +77,7 @@ namespace Routix {
         /// konstruktor
         /// </summary>
         public Routix() {
+            sendRoute = new List<bool>();
             for (int i = 0; i < 100; i++ ) sendRoute.Add(true);
             numberOfRoutes = 0;
             firstRun = true;
