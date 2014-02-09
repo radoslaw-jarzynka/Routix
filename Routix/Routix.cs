@@ -47,7 +47,7 @@ namespace Routix {
 
         private bool blockSending;
         private bool firstRun;
-
+        private bool sendRoute;
         int exceptionCount;
         //strumienie
         private NetworkStream networkStream;
@@ -76,6 +76,7 @@ namespace Routix {
         /// konstruktor
         /// </summary>
         public Routix() {
+            sendRoute = true;
             firstRun = true;
             isConnectedToCloud = false;
             blockSending = false;
@@ -275,9 +276,16 @@ namespace Routix {
                             //_msgList.RemoveAt(0);
                             String[] _CCmsg = _msgList.ToArray();
                             if (_CCmsg[0] == "REQ_ROUTE") {
+                                sendRoute = true;
                                 IVertexAndEdgeListGraph<string, Edge<string>> graph = networkGraph;
                                 string root = _CCmsg[1];
                                 string target = _CCmsg[2];
+                                if (_CCmsg.Length == 4)
+                                {
+                                    AdjacencyGraph<String, Edge<String>> _graph = networkGraph;
+                                    _graph.RemoveVertex(_CCmsg[3]);
+                                    graph = _graph;
+                                }
                                 calculatePath(graph, root, target);
                             }
                             #endregion
@@ -372,7 +380,11 @@ namespace Routix {
                                         _routeMsg.Add("ROUTE");
                                         foreach (string str in nodesInPath) _routeMsg.Add(str);
                                         SPacket packet = new SPacket(myAddr.ToString(), ccAddr, _routeMsg);
-                                        whatToSendQueue.Enqueue(packet);
+                                        if (sendRoute)
+                                        {
+                                            whatToSendQueue.Enqueue(packet);
+                                            sendRoute = false;
+                                        }
                                     }
                                 }
                             }
@@ -558,7 +570,8 @@ namespace Routix {
                             }
                             SetText(edge.ToString());
                             nodesInPath.Add(edge.Target);
-                            _nodesInPath.Add(edge.Target);
+                            String[] _arr = edge.Target.Split('.');
+                            if (_arr[2] != "*") _nodesInPath.Add(edge.Target);
                         }
                     }
                     //pyta każdego LRM o to, czy jest wolne łącze do LRM następnego w kolejce
